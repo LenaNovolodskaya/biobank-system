@@ -1,0 +1,65 @@
+spring:
+  application:
+    name: biobank-backend
+  
+  # Отключаем Spring Security полностью на время разработки
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+      - org.springframework.boot.actuator.autoconfigure.security.servlet.ManagementWebSecurityAutoConfiguration
+  
+  datasource:
+    url: jdbc:postgresql://localhost:5432/biobank
+    username: postgres
+    password: postgresql
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-timeout: 30000
+      maximum-pool-size: 10
+  
+  jpa:
+    hibernate:
+      ddl-auto: update # create-drop
+    show-sql: true
+    defer-datasource-initialization: true
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+
+  sql:
+    init:
+      mode: always
+      schema-locations: []
+      data-locations: classpath:data.sql
+  
+  # Отключаем CORS на время разработки
+  web:
+    cors:
+      allowed-origins: "http://localhost:8081"
+      allowed-methods: "*"
+      allowed-headers: "*"
+      allow-credentials: true
+
+server:
+  port: 8080
+  # УБЕРИТЕ эту строку:
+  # servlet:
+  #   context-path: /api
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,mappings"  # Включить только нужные
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    root: INFO
+    ru.healthfamily.biobank: DEBUG
+    org.springframework.web: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
