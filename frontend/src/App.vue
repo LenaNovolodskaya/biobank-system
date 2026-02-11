@@ -8,6 +8,7 @@
         <li><router-link to="/researches">Исследования</router-link></li>
         <li><router-link to="/visits">Визиты</router-link></li>
         <li><router-link to="/patients">Пациенты</router-link></li>
+        <li><router-link to="/references">Справочники</router-link></li>
       </ul>
     </nav>
 
@@ -95,8 +96,8 @@ body {
 }
 
 .main-content {
-  padding: 0.5rem;
-  max-width: 1400px;
+  padding: 0.5rem 1.5rem;
+  max-width: 98%;
   margin: 0 auto;
 }
 

@@ -31,7 +31,7 @@
         <table class="research-table">
           <thead>
             <tr>
-              <th>
+              <th class="number-col">
                 <div class="header-help" @click.stop>
                   <span>№</span>
                   <button
@@ -50,7 +50,7 @@
                   </div>
                 </div>
               </th>
-              <th>
+              <th class="name-col">
                 <div class="header-help" @click.stop>
                   <span>Название</span>
                   <button
@@ -66,7 +66,7 @@
                   </div>
                 </div>
               </th>
-              <th>
+              <th class="group-col">
                 <div class="header-help" @click.stop>
                   <span>Группа</span>
                   <button
@@ -82,7 +82,7 @@
                   </div>
                 </div>
               </th>
-              <th>
+              <th class="financing-col">
                 <div class="header-help" @click.stop>
                   <span>Финансирование</span>
                   <button
@@ -101,7 +101,7 @@
                   </div>
                 </div>
               </th>
-              <th class="header-help-cell">
+              <th class="department-col">
                 <div class="header-help" @click.stop>
                   <span>Подразделение</span>
                   <button
@@ -120,7 +120,7 @@
                   </div>
                 </div>
               </th>
-              <th>
+              <th class="active-col">
                 <div class="header-help" @click.stop>
                   <span>Активно</span>
                   <button
@@ -150,20 +150,20 @@
               :class="{ selected: research.researchId === selectedResearchId }"
               @click="selectResearch(research.researchId)"
             >
-              <td>{{ research.researchNumber }}</td>
-              <td class="wrap-cell">{{ research.researchName }}</td>
-              <td class="wrap-cell">
+              <td class="number-col">{{ research.researchNumber }}</td>
+              <td class="wrap-cell name-col">{{ research.researchName }}</td>
+              <td class="wrap-cell group-col">
                 {{ getReferenceName(researchGroups, research.researchGroupId) }}
               </td>
-              <td class="wrap-cell">
+              <td class="wrap-cell financing-col">
                 {{
                   getReferenceName(financingSources, research.financingSourceId)
                 }}
               </td>
-              <td class="wrap-cell">
+              <td class="wrap-cell department-col">
                 {{ getReferenceName(departments, research.departmentId) }}
               </td>
-              <td>{{ research.isActive ? "Да" : "Нет" }}</td>
+              <td class="active-col">{{ research.isActive ? "Да" : "Нет" }}</td>
               <td class="action-col">
                 <button
                   class="icon-button"
@@ -442,24 +442,6 @@
           </button>
         </div>
         <form class="form-grid" @submit.prevent="submitRefModal">
-          <div class="form-group">
-            <label for="refSelect">Существующая запись</label>
-            <select
-              id="refSelect"
-              v-model.number="refModalId"
-              class="form-control"
-              @change="fillRefModalName"
-            >
-              <option :value="null">Не указано</option>
-              <option
-                v-for="item in refModalItems"
-                :key="item.id"
-                :value="item.id"
-              >
-                {{ item.name }}
-              </option>
-            </select>
-          </div>
           <div class="form-group">
             <label for="refName">Название</label>
             <input
@@ -894,7 +876,7 @@ export default defineComponent({
 
 <style scoped>
 .research-page {
-  max-width: 1400px;
+  max-width: 98%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -944,6 +926,7 @@ h2 {
 
 .research-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.95rem;
 }
@@ -953,7 +936,45 @@ h2 {
   border-bottom: 1px solid var(--border);
   padding: 10px;
   text-align: left;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.research-table td {
+  white-space: pre-line;
+}
+
+.research-table .number-col {
+  width: 10%;
+  max-width: 10%;
+}
+.research-table .name-col {
+  width: 25%;
+  max-width: 25%;
+}
+.research-table .group-col {
+  width: 20%;
+  max-width: 20%;
+}
+.research-table .financing-col {
+  width: 15%;
+  max-width: 15%;
+}
+.research-table .department-col {
+  width: 15%;
+  max-width: 15%;
+}
+.research-table .active-col {
+  width: 7%;
+  max-width: 7%;
+}
+
+.research-table th.action-col,
+.research-table td.action-col {
+  width: 4%;
+  min-width: 44px;
+  max-width: 4%;
+  text-align: center;
 }
 
 .header-help {
@@ -1014,14 +1035,6 @@ h2 {
 
 .research-table td.wrap-cell {
   white-space: normal;
-  max-width: 260px;
-  word-break: break-word;
-}
-
-.research-table th.action-col,
-.research-table td.action-col {
-  width: 44px;
-  text-align: center;
 }
 
 .header-button {

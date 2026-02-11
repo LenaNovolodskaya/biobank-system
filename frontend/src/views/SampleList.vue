@@ -167,10 +167,30 @@
                 @click="selectSample(sample.sampleId)"
               >
                 <td v-for="column in visibleColumns" :key="column.key">
-                  <template v-if="column.key === 'barcode'">
+                  <template v-if="column.key === 'sampleTypeIcon'">
+                    <img
+                      v-if="getSampleTypeIconUrl(sample.sampleTypeId)"
+                      :src="getSampleTypeIconUrl(sample.sampleTypeId)!"
+                      :alt="getSampleTypeName(sample.sampleTypeId)"
+                      class="sample-type-icon"
+                    />
+                    <span v-else>—</span>
+                  </template>
+                  <template v-else-if="column.key === 'barcode'">
                     <div class="barcode-cell">
                       <BarcodeSvg :value="sample.barcode" />
                       <span>{{ sample.barcode }}</span>
+                    </div>
+                  </template>
+                  <template v-else-if="column.key === 'createdAtSample'">
+                    <div class="date-cell">
+                      <div>{{ formatDateOnly(sample.createdAtSample) }}</div>
+                      <div
+                        v-if="formatTimeOnly(sample.createdAtSample)"
+                        class="time-line"
+                      >
+                        {{ formatTimeOnly(sample.createdAtSample) }}
+                      </div>
                     </div>
                   </template>
                   <template v-else>
@@ -222,23 +242,35 @@
                   >
                     Нет аликвот
                   </div>
-                  <div
-                    v-for="aliquot in getSampleAliquots(sample)"
-                    :key="aliquot.aliquotId"
-                    class="aliquot-row"
-                  >
-                    <BarcodeSvg :value="aliquot.barcode" />
-                    <span class="aliquot-barcode">{{ aliquot.barcode }}</span>
-                    <span class="aliquot-status">{{
-                      getSampleStatusName(aliquot.sampleStatusId)
-                    }}</span>
-                    <span class="aliquot-position">{{
-                      aliquot.positionInContainer || "—"
-                    }}</span>
-                    <span v-if="aliquot.containerId" class="aliquot-container">
-                      {{ getContainerLabel(aliquot.containerId) }}
-                    </span>
-                  </div>
+                  <table v-else class="aliquots-table">
+                    <thead>
+                      <tr>
+                        <th>Штрихкод</th>
+                        <th>Статус</th>
+                        <th>Позиция</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr
+                        v-for="aliquot in getSampleAliquots(sample)"
+                        :key="aliquot.aliquotId"
+                        class="aliquot-row"
+                      >
+                        <td class="aliquot-barcode-cell">
+                          <BarcodeSvg :value="aliquot.barcode" />
+                          <span class="aliquot-barcode">{{
+                            aliquot.barcode
+                          }}</span>
+                        </td>
+                        <td class="aliquot-status">
+                          {{ getSampleStatusName(aliquot.sampleStatusId) }}
+                        </td>
+                        <td class="aliquot-position">
+                          {{ aliquot.positionInContainer || "—" }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </td>
               </tr>
             </template>
@@ -295,7 +327,7 @@
             </select>
           </div>
           <div class="form-group">
-            <label for="modalInitialQty">Начальное количество пробирок *</label>
+            <label for="modalInitialQty">Начальное количество аликвот *</label>
             <input
               id="modalInitialQty"
               v-model.number="modalSample.initialQuantity"
@@ -306,7 +338,7 @@
             />
           </div>
           <div class="form-group">
-            <label for="modalCurrentQty">Текущее количество пробирок *</label>
+            <label for="modalCurrentQty">Текущее количество аликвот *</label>
             <input
               id="modalCurrentQty"
               v-model.number="modalSample.currentQuantity"
@@ -392,29 +424,14 @@
                   </option>
                 </select>
                 <select
-                  v-model.number="aliquot.containerId"
-                  class="form-control"
-                >
-                  <option :value="null">Не указано</option>
-                  <option
-                    v-for="c in containers"
-                    :key="c.containerId"
-                    :value="c.containerId"
-                  >
-                    {{ c.containerType || "Контейнер" }} №{{
-                      c.containerNumber ?? "—"
-                    }}
-                  </option>
-                </select>
-                <select
                   v-model="aliquot.positionInContainer"
                   class="form-control"
-                  :disabled="!aliquot.containerId"
+                  :disabled="!modalSample.containerId"
                 >
                   <option value="">Не указано</option>
                   <option
                     v-for="pos in positionsForAliquotContainer(
-                      aliquot.containerId,
+                      modalSample.containerId,
                       index
                     )"
                     :key="pos.value"
@@ -531,6 +548,7 @@ interface DiagnosisRef {
 interface SampleTypeRef {
   sampleTypeId: number;
   sampleTypeName: string;
+  iconPath?: string | null;
 }
 
 interface SampleStatusRef {
@@ -547,6 +565,7 @@ interface ContainerRef {
   columnsCount: number | null;
   maxSamplesCount: number;
   currentSamplesCount: number;
+  numberingType: string | null;
 }
 
 const resolveContainerLayout = (container: ContainerRef) => {
@@ -629,19 +648,15 @@ export default defineComponent({
       ageMinFilter: null as number | null | string,
       ageMaxFilter: null as number | null | string,
       columns: [
+        { key: "sampleTypeIcon", label: "", visible: true },
         { key: "barcode", label: "Штрихкод", visible: true },
-        { key: "researchInfo", label: "Исследование", visible: true },
-        { key: "patientAge", label: "Возраст", visible: true },
-        { key: "mainDiagnosis", label: "Основной диагноз", visible: true },
-        { key: "patientGender", label: "Пол", visible: true },
-        { key: "patientBirthDate", label: "Дата рождения", visible: true },
-        { key: "patientNationality", label: "Национальность", visible: true },
         { key: "sampleTypeId", label: "Тип", visible: true },
+        { key: "containerId", label: "Контейнер", visible: true },
         { key: "initialQuantity", label: "Начальное кол-во", visible: true },
         { key: "currentQuantity", label: "Текущее кол-во", visible: true },
         {
-          key: "recommendedStorageMonths",
-          label: "Рек. хранение",
+          key: "createdAtSample",
+          label: "Дата забора",
           visible: true,
         },
         {
@@ -649,11 +664,21 @@ export default defineComponent({
           label: "Факт. хранение",
           visible: true,
         },
+        {
+          key: "recommendedStorageMonths",
+          label: "Рек. хранение",
+          visible: true,
+        },
         { key: "expiryStatus", label: "Срок хранения", visible: true },
-        { key: "containerId", label: "Контейнер", visible: true },
-        { key: "createdAtSample", label: "Создан", visible: true },
+        { key: "patientAge", label: "Возраст", visible: true },
+        { key: "mainDiagnosis", label: "Основной диагноз", visible: true },
+        { key: "patientGender", label: "Пол", visible: true },
+        { key: "patientBirthDate", label: "Дата рождения", visible: true },
+        { key: "patientNationality", label: "Национальность", visible: true },
+        { key: "researchInfo", label: "Исследование", visible: true },
       ] as ColumnConfig[],
       headerHelp: {
+        sampleTypeIcon: "",
         barcode: "Штрихкод образца",
         researchInfo: "Номер и название темы исследования",
         patientAge: "Возраст пациента на момент забора биоматериала",
@@ -665,9 +690,9 @@ export default defineComponent({
           "Национальность пациента, у которого взят биоматериал",
         sampleTypeId: "Вид забранного биологического материала",
         initialQuantity:
-          "Общее количество идентичных пробирок (аликвот), полученных от пациента и первоначально зарегистрированных в хранилище",
+          "Общее количество идентичных аликвот, полученных от пациента и первоначально зарегистрированных в хранилище",
         currentQuantity:
-          "Текущее количество пробирок (аликвот) данного образца, оставшихся в хранилище на данный момент",
+          "Текущее количество аликвот данного образца, оставшихся в хранилище на данный момент",
         recommendedStorageMonths:
           "Срок, в течение которого образец гарантированно пригоден для анализа согласно протоколу исследования",
         actualStorageMonths:
@@ -759,6 +784,9 @@ export default defineComponent({
       if (this.modalMode === "create" && this.tubeCount > 0) {
         this.syncAliquots();
       }
+    },
+    "modalSample.containerId"() {
+      this.syncAliquots();
     },
   },
   methods: {
@@ -953,11 +981,24 @@ export default defineComponent({
           occupied.add(a.positionInContainer);
         }
       });
+      const getPositionLabel = (
+        container: ContainerRef,
+        row: number,
+        column: number,
+        columns: number
+      ): string => {
+        const t = container.numberingType || "LETTER_DIGIT";
+        const index0 = (row - 1) * columns + (column - 1);
+        if (t === "SEQUENTIAL") return String(index0 + 1);
+        if (t === "DIGIT_LETTER") return `${row}${getColumnLabel(column)}`;
+        if (t === "DIGIT_DIGIT") return `${row}/${column}`;
+        return `${getColumnLabel(column)}${row}`;
+      };
       return Array.from({ length: layout.total }, (_, i) => {
         const index = i + 1;
         const row = Math.floor((index - 1) / layout.columns) + 1;
         const column = ((index - 1) % layout.columns) + 1;
-        const value = `${getColumnLabel(column)}${row}`;
+        const value = getPositionLabel(container, row, column, layout.columns);
         return {
           value,
           disabled: occupied.has(value),
@@ -1126,10 +1167,11 @@ export default defineComponent({
       }
     },
     serializeSampleForm() {
+      const sampleContainerId = this.modalSample.containerId ?? null;
       const aliquots = (this.modalSample.aliquots || []).map((a) => ({
         barcode: a.barcode.trim(),
         sampleStatusId: a.sampleStatusId,
-        containerId: a.containerId,
+        containerId: sampleContainerId,
         positionInContainer: a.positionInContainer || null,
       }));
       return {
@@ -1224,12 +1266,29 @@ export default defineComponent({
       if (!value) return "—";
       return new Date(value).toLocaleDateString("ru-RU");
     },
+    formatTimeOnly(value: string) {
+      if (!value) return "";
+      return new Date(value).toLocaleTimeString("ru-RU", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    },
     getSampleTypeName(sampleTypeId: number | null | undefined) {
       if (!sampleTypeId) return "—";
       const type = this.sampleTypes.find(
         (item) => item.sampleTypeId === sampleTypeId
       );
       return type?.sampleTypeName || "—";
+    },
+    getSampleTypeIconUrl(
+      sampleTypeId: number | null | undefined
+    ): string | null {
+      if (!sampleTypeId) return null;
+      const type = this.sampleTypes.find(
+        (item) => item.sampleTypeId === sampleTypeId
+      );
+      if (!type?.iconPath) return null;
+      return `/img/sample-types/${type.iconPath}`;
     },
     getSampleStatusName(sampleStatusId: number | null | undefined) {
       if (!sampleStatusId) return "—";
@@ -1365,7 +1424,7 @@ export default defineComponent({
 
 <style scoped>
 .sample-page {
-  max-width: 1400px;
+  max-width: 98%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -1420,7 +1479,7 @@ h2 {
 }
 
 .aliquots-details-row {
-  background-color: #e8e0d8;
+  background-color: #f0e9df;
 }
 
 .aliquots-cell {
@@ -1434,17 +1493,51 @@ h2 {
   margin-bottom: 8px;
 }
 
-.aliquot-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 20px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--border);
+.aliquots-table {
+  border-collapse: collapse;
+  width: max-content;
+  margin-top: 8px;
 }
 
-.aliquot-row:last-child {
-  border-bottom: none;
+.aliquots-table thead th,
+.aliquots-table tbody td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: normal;
+  word-break: break-word;
+}
+
+.aliquots-table thead th {
+  background-color: #f0e9df;
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--border);
+  font-weight: 600;
+}
+
+.aliquots-table thead th:nth-child(1),
+.aliquots-table tbody td:nth-child(1) {
+  min-width: 160px;
+}
+
+.aliquots-table thead th:nth-child(2),
+.aliquots-table tbody td:nth-child(2) {
+  min-width: 110px;
+}
+
+.aliquots-table thead th:nth-child(3),
+.aliquots-table tbody td:nth-child(3) {
+  min-width: 90px;
+}
+
+.aliquot-barcode-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.aliquot-barcode-cell :deep(.barcode-svg) {
+  max-width: 140px;
 }
 
 .aliquot-barcode {
@@ -1453,8 +1546,7 @@ h2 {
 }
 
 .aliquot-status,
-.aliquot-position,
-.aliquot-container {
+.aliquot-position {
   color: var(--text-secondary);
   font-size: 0.9rem;
 }
@@ -1472,7 +1564,7 @@ h2 {
 
 .aliquot-form-row {
   display: grid;
-  grid-template-columns: 100px 1fr 140px 140px 120px;
+  grid-template-columns: 100px 1fr 140px 120px;
   gap: 8px;
   align-items: center;
 }
@@ -1572,7 +1664,7 @@ h2 {
   padding: 10px;
   text-align: left;
   white-space: normal;
-  max-width: 400px;
+  max-width: 300px;
   word-break: break-word;
 }
 
@@ -1685,6 +1777,23 @@ h2 {
 
 .barcode-cell :deep(.barcode-svg) {
   max-width: 200px;
+}
+
+.samples-table .date-cell {
+  white-space: normal;
+  line-height: 1.2;
+}
+
+.samples-table .time-line {
+  font-size: 0.85em;
+  color: var(--text-secondary);
+}
+
+.sample-type-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  vertical-align: middle;
 }
 
 .section-header {

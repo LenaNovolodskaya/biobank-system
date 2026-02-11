@@ -4,6 +4,7 @@ import StorageView from "@/views/StorageView.vue";
 import SampleList from "@/views/SampleList.vue";
 import ResearchList from "@/views/ResearchList.vue";
 import VisitList from "@/views/VisitList.vue";
+import ReferencesView from "@/views/ReferencesView.vue";
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -34,6 +35,11 @@ const routes: Array<RouteRecordRaw> = [
     path: "/visits",
     name: "Visits",
     component: VisitList,
+  },
+  {
+    path: "/references",
+    name: "References",
+    component: ReferencesView,
   },
 ];
 

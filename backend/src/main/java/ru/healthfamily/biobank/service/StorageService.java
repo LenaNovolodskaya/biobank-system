@@ -57,6 +57,7 @@ public class StorageService {
         container.setShelfNumber(request.getShelfNumber());
         container.setContainerType(request.getContainerType());
         container.setContainerNumber(request.getContainerNumber());
+        container.setNumberingType(request.getNumberingType());
         applyContainerLayout(container, request);
         Integer current = request.getCurrentSamplesCount();
         container.setCurrentSamplesCount(current == null ? 0 : current);
@@ -113,6 +114,9 @@ public class StorageService {
         container.setShelfNumber(request.getShelfNumber());
         container.setContainerType(request.getContainerType());
         container.setContainerNumber(request.getContainerNumber());
+        if (request.getNumberingType() != null) {
+            container.setNumberingType(request.getNumberingType());
+        }
         applyContainerLayout(container, request);
         Integer current = request.getCurrentSamplesCount();
         if (current != null) {
@@ -180,7 +184,8 @@ public class StorageService {
                 container.getRowsCount(),
                 container.getColumnsCount(),
                 container.getMaxSamplesCount(),
-                container.getCurrentSamplesCount()
+                container.getCurrentSamplesCount(),
+                container.getNumberingType()
         );
     }
 

@@ -22,6 +22,9 @@ public class SampleType {
     @Column(name = "sample_type_id")
     private Long sampleTypeId;
 
-    @Column(name = "sample_type_name", nullable = false)
+    @Column(name = "sample_type_name", nullable = false, unique = true)
     private String sampleTypeName;
+
+    @Column(name = "icon_path")
+    private String iconPath;
 }

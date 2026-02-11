@@ -324,26 +324,41 @@
                     :key="`col-${col}`"
                     class="scheme-grid-header"
                   >
-                    {{ getColumnLabel(col) }}
+                    {{ getColumnHeaderLabel(container, col) }}
                   </div>
                   <template
                     v-for="row in containerGridRows(container)"
                     :key="`row-${row}`"
                   >
-                    <div class="scheme-grid-header row-header">{{ row }}</div>
+                    <div class="scheme-grid-header row-header">
+                      {{ getRowHeaderLabel(container, row) }}
+                    </div>
                     <div
                       v-for="cell in containerRowCells(container, row)"
                       :key="cell.label"
                       class="scheme-cell"
                       :class="{
                         filled: cell.filled,
+                        'filled-with-icon':
+                          cell.filled && !!cell.sampleTypeIconUrl,
                         'expiry-green': cell.expiryStatus === 'GREEN',
                         'expiry-yellow': cell.expiryStatus === 'YELLOW',
                         'expiry-red': cell.expiryStatus === 'RED',
                       }"
                       :title="cell.sampleBarcode || ''"
                       @click="onCellClick(container, cell)"
-                    ></div>
+                    >
+                      <div
+                        v-if="cell.filled && cell.sampleTypeIconUrl"
+                        class="scheme-cell-icon-wrap"
+                      >
+                        <img
+                          :src="cell.sampleTypeIconUrl"
+                          class="scheme-cell-icon"
+                          :alt="''"
+                        />
+                      </div>
+                    </div>
                   </template>
                 </div>
               </div>
@@ -565,29 +580,14 @@
                     </option>
                   </select>
                   <select
-                    v-model.number="aliquot.containerId"
-                    class="form-control"
-                  >
-                    <option :value="null">Не указано</option>
-                    <option
-                      v-for="c in containerRefs"
-                      :key="c.containerId"
-                      :value="c.containerId"
-                    >
-                      {{ c.containerType || "Контейнер" }} №{{
-                        c.containerNumber ?? "—"
-                      }}
-                    </option>
-                  </select>
-                  <select
                     v-model="aliquot.positionInContainer"
                     class="form-control"
-                    :disabled="!aliquot.containerId"
+                    :disabled="!drawerSampleForm.containerId"
                   >
                     <option value="">Не указано</option>
                     <option
                       v-for="pos in drawerPositionsForAliquot(
-                        aliquot.containerId,
+                        drawerSampleForm.containerId,
                         index
                       )"
                       :key="pos.value"
@@ -704,6 +704,27 @@
 
           <template v-if="modalType === 'container'">
             <div class="form-group">
+              <label for="modalContainerTemplate">Шаблон контейнера</label>
+              <select
+                id="modalContainerTemplate"
+                v-model="selectedContainerTemplateId"
+                class="form-control"
+                @change="onContainerTemplateSelect"
+              >
+                <option value="">
+                  — Выберите шаблон или введите вручную —
+                </option>
+                <option
+                  v-for="t in containerTemplates"
+                  :key="t.templateId"
+                  :value="t.templateId"
+                >
+                  {{ t.templateName }} ({{ t.rowsCount }}×{{ t.columnsCount }},
+                  {{ numberingTypeLabel(t.numberingType) }})
+                </option>
+              </select>
+            </div>
+            <div class="form-group">
               <label for="modalContainerType">Тип упаковки</label>
               <input
                 id="modalContainerType"
@@ -770,6 +791,20 @@
               />
             </div>
             <div class="form-group">
+              <label for="modalNumberingType">Тип нумерации</label>
+              <select
+                id="modalNumberingType"
+                v-model="modalContainer.numberingType"
+                class="form-control"
+              >
+                <option value="">— По умолчанию —</option>
+                <option value="LETTER_DIGIT">Буква+цифра (A1, B2, …)</option>
+                <option value="DIGIT_LETTER">Цифра+буква (1A, 2B, …)</option>
+                <option value="DIGIT_DIGIT">Цифра/цифра (1/1, 5/5, …)</option>
+                <option value="SEQUENTIAL">Сквозная (1–25, …)</option>
+              </select>
+            </div>
+            <div class="form-group">
               <label for="modalCurrentSamples">Текущее кол-во</label>
               <input
                 id="modalCurrentSamples"
@@ -805,6 +840,16 @@ interface StorageContainer {
   columnsCount: number | null;
   maxSamplesCount: number;
   currentSamplesCount: number;
+  numberingType: string | null;
+}
+
+interface ContainerTypeTemplate {
+  templateId: number;
+  templateName: string;
+  rowsCount: number;
+  columnsCount: number;
+  numberingType: string;
+  displayOrder: number | null;
 }
 
 interface StorageUnit {
@@ -883,6 +928,7 @@ interface DiagnosisRef {
 interface SampleTypeRef {
   sampleTypeId: number;
   sampleTypeName: string;
+  iconPath?: string | null;
 }
 
 interface SampleStatusRef {
@@ -911,6 +957,7 @@ interface NewContainerForm {
   columnsCount: number | null;
   maxSamplesCount: number | null;
   currentSamplesCount: number | null;
+  numberingType: string | null;
 }
 
 export default defineComponent({
@@ -949,7 +996,9 @@ export default defineComponent({
         columnsCount: null,
         maxSamplesCount: null,
         currentSamplesCount: null,
+        numberingType: null,
       } as NewContainerForm,
+      selectedContainerTemplateId: "" as string,
       dragContainerId: null as number | null,
       dragSourceShelfIndex: null as number | null,
       containerRefs: [] as StorageContainer[],
@@ -959,6 +1008,7 @@ export default defineComponent({
       diagnoses: [] as DiagnosisRef[],
       sampleTypes: [] as SampleTypeRef[],
       sampleStatuses: [] as SampleStatusRef[],
+      containerTemplates: [] as ContainerTypeTemplate[],
       sampleDrawerOpen: false,
       sampleDrawerMode: null as "details" | "create" | "edit" | null,
       drawerFormInitializing: false,
@@ -1215,6 +1265,7 @@ export default defineComponent({
           typesResponse,
           statusesResponse,
           containersResponse,
+          templatesResponse,
           visitsResponse,
           patientsResponse,
           researchesResponse,
@@ -1223,6 +1274,7 @@ export default defineComponent({
           axios.get("/references/sample-types"),
           axios.get("/references/sample-statuses"),
           axios.get("/storage/containers"),
+          axios.get("/references/container-templates"),
           axios.get("/visits"),
           axios.get("/patients"),
           axios.get("/researches"),
@@ -1236,6 +1288,7 @@ export default defineComponent({
           statusesResponse.data,
           (item) => item.sampleStatusName
         );
+        this.containerTemplates = templatesResponse.data || [];
         this.containerRefs = [...containersResponse.data].sort(
           (a: StorageContainer, b: StorageContainer) =>
             this.getContainerLabel(a.containerId).localeCompare(
@@ -1318,6 +1371,33 @@ export default defineComponent({
         current = Math.floor((current - 1) / 26);
       }
       return result;
+    },
+    getColumnHeaderLabel(container: StorageContainer, col: number): string {
+      const t = container.numberingType || "LETTER_DIGIT";
+      if (t === "SEQUENTIAL" || t === "DIGIT_DIGIT") return String(col);
+      return this.getColumnLabel(col);
+    },
+    getRowHeaderLabel(container: StorageContainer, row: number): string {
+      return String(row);
+    },
+    getPositionLabelForCell(
+      container: StorageContainer,
+      row: number,
+      col: number,
+      columns: number
+    ): string {
+      const numberingType = container.numberingType || "LETTER_DIGIT";
+      const index0 = (row - 1) * columns + (col - 1);
+      if (numberingType === "SEQUENTIAL") {
+        return String(index0 + 1);
+      }
+      if (numberingType === "DIGIT_LETTER") {
+        return `${row}${this.getColumnLabel(col)}`;
+      }
+      if (numberingType === "DIGIT_DIGIT") {
+        return `${row}/${col}`;
+      }
+      return `${this.getColumnLabel(col)}${row}`;
     },
     getColumnIndex(label: string): number | null {
       if (!label) {
@@ -1431,6 +1511,7 @@ export default defineComponent({
       label: string;
       filled: boolean;
       sampleBarcode?: string;
+      sampleTypeIconUrl?: string | null;
       expiryStatus?: string;
     }> {
       const { columns } = this.resolveContainerLayout(container);
@@ -1440,12 +1521,20 @@ export default defineComponent({
       const filled = this.getContainerSampleMap(container);
       return Array.from({ length: columns }, (_, i) => {
         const column = i + 1;
-        const label = `${this.getColumnLabel(column)}${row}`;
+        const label = this.getPositionLabelForCell(
+          container,
+          row,
+          column,
+          columns
+        );
         const sample = filled.get(label);
         return {
           label,
           filled: filled.has(label),
           sampleBarcode: sample?.barcode,
+          sampleTypeIconUrl: sample
+            ? this.getSampleTypeIconUrl(sample.sampleTypeId)
+            : undefined,
           expiryStatus: sample ? this.getSampleExpiryStatus(sample) : undefined,
         };
       });
@@ -1494,6 +1583,16 @@ export default defineComponent({
         (item) => item.sampleTypeId === sampleTypeId
       );
       return type?.sampleTypeName || "—";
+    },
+    getSampleTypeIconUrl(
+      sampleTypeId: number | null | undefined
+    ): string | null {
+      if (!sampleTypeId) return null;
+      const type = this.sampleTypes.find(
+        (item) => item.sampleTypeId === sampleTypeId
+      );
+      if (!type?.iconPath) return null;
+      return `/img/sample-types/${type.iconPath}`;
     },
     getSampleStatusName(sampleStatusId: number | null | undefined) {
       if (!sampleStatusId) return "—";
@@ -1726,8 +1825,9 @@ export default defineComponent({
             barcode: baseBarcode ? `${baseBarcode}-${i + 1}` : "",
             sampleStatusId: this.getStorageStatusId(),
             containerId:
+              this.drawerSampleForm.containerId ??
               this.selectedCell?.containerId ??
-              this.drawerSampleForm.containerId,
+              null,
             positionInContainer: this.selectedCell?.label ?? "",
           });
         }
@@ -1770,7 +1870,12 @@ export default defineComponent({
         const index = i + 1;
         const row = Math.floor((index - 1) / layout.columns) + 1;
         const column = ((index - 1) % layout.columns) + 1;
-        const value = `${this.getColumnLabel(column)}${row}`;
+        const value = this.getPositionLabelForCell(
+          container,
+          row,
+          column,
+          layout.columns
+        );
         return { value, disabled: occupied.has(value) };
       });
     },
@@ -1983,23 +2088,28 @@ export default defineComponent({
           (sample) => sample.sampleId === this.selectedSample?.sampleId
         ) || null;
       const firstAliquot = this.drawerSampleForm.aliquots?.[0];
-      if (
-        refreshed &&
-        firstAliquot?.containerId &&
-        firstAliquot?.positionInContainer
-      ) {
+      const containerId =
+        this.drawerSampleForm.containerId ??
+        this.selectedCell?.containerId ??
+        firstAliquot?.containerId ??
+        null;
+      if (refreshed && containerId && firstAliquot?.positionInContainer) {
         this.openSampleDetails(
-          firstAliquot.containerId,
+          containerId,
           firstAliquot.positionInContainer,
           refreshed
         );
       }
     },
     serializeSampleForm() {
+      const sampleContainerId =
+        this.drawerSampleForm.containerId ??
+        this.selectedCell?.containerId ??
+        null;
       const aliquots = (this.drawerSampleForm.aliquots || []).map((a) => ({
         barcode: a.barcode.trim(),
         sampleStatusId: a.sampleStatusId,
-        containerId: a.containerId,
+        containerId: sampleContainerId,
         positionInContainer: a.positionInContainer || null,
       }));
       return {
@@ -2046,6 +2156,30 @@ export default defineComponent({
       if (rows && columns) {
         this.modalContainer.maxSamplesCount = rows * columns;
       }
+    },
+    numberingTypeLabel(type: string | null): string {
+      if (!type) return "—";
+      const map: Record<string, string> = {
+        LETTER_DIGIT: "буква+цифра",
+        DIGIT_LETTER: "цифра+буква",
+        DIGIT_DIGIT: "цифра/цифра",
+        SEQUENTIAL: "сквозная",
+      };
+      return map[type] || type;
+    },
+    onContainerTemplateSelect() {
+      const templateId = this.selectedContainerTemplateId;
+      if (!templateId) return;
+      const t = this.containerTemplates.find(
+        (x) => String(x.templateId) === String(templateId)
+      );
+      if (!t) return;
+      this.modalContainer.containerType = t.templateName;
+      this.modalContainer.rowsCount = t.rowsCount;
+      this.modalContainer.columnsCount = t.columnsCount;
+      this.modalContainer.maxSamplesCount = t.rowsCount * t.columnsCount;
+      this.modalContainer.numberingType = t.numberingType;
+      this.syncContainerCapacity();
     },
     getSamplesForContainer(containerId: number): Sample[] {
       return this.samples.filter((sample) => {
@@ -2234,6 +2368,7 @@ export default defineComponent({
           columnsCount: container.columnsCount,
           maxSamplesCount: container.maxSamplesCount,
           currentSamplesCount: container.currentSamplesCount,
+          numberingType: container.numberingType,
         });
       }
     },
@@ -2275,6 +2410,7 @@ export default defineComponent({
       this.modalType = "container";
       this.modalMode = "create";
       this.modalTitle = "Добавить контейнер";
+      this.selectedContainerTemplateId = "";
       this.modalContainer = {
         shelfNumber: shelfLabel,
         containerType: "",
@@ -2283,6 +2419,7 @@ export default defineComponent({
         columnsCount: null,
         maxSamplesCount: null,
         currentSamplesCount: null,
+        numberingType: null,
       };
       this.syncContainerCapacity();
       this.modalOpen = true;
@@ -2413,6 +2550,7 @@ export default defineComponent({
       this.modalType = "container";
       this.modalMode = "edit";
       this.modalTitle = "Обновить контейнер";
+      this.selectedContainerTemplateId = "";
       this.modalContainer = {
         shelfNumber: this.selectedContainer.shelfNumber || "",
         containerType: this.selectedContainer.containerType || "",
@@ -2421,6 +2559,7 @@ export default defineComponent({
         columnsCount: this.selectedContainer.columnsCount,
         maxSamplesCount: this.selectedContainer.maxSamplesCount,
         currentSamplesCount: this.selectedContainer.currentSamplesCount,
+        numberingType: this.selectedContainer.numberingType,
       };
       this.syncContainerCapacity();
       this.modalOpen = true;
@@ -2583,7 +2722,7 @@ export default defineComponent({
 
 <style scoped>
 .storage-page {
-  max-width: 1400px;
+  max-width: 98%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -2879,6 +3018,12 @@ h2 {
   color: #f2ede6;
 }
 
+.scheme-cell.filled-with-icon {
+  background: #e2d6c8;
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
 .scheme-cell.expiry-green {
   box-shadow: 0 0 0 2px #2f9e44;
 }
@@ -2889,6 +3034,22 @@ h2 {
 
 .scheme-cell.expiry-red {
   box-shadow: 0 0 0 2px #d94841;
+}
+
+.scheme-cell-icon-wrap {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #f0e9df;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scheme-cell-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
 }
 
 .sample-drawer {
@@ -2983,7 +3144,7 @@ h2 {
 
 .tube-row {
   display: grid;
-  grid-template-columns: 100px 1fr 140px 140px 120px;
+  grid-template-columns: 100px 1fr 140px 120px;
   gap: 8px;
   align-items: center;
 }

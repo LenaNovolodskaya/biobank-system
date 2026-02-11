@@ -45,7 +45,7 @@
                   </div>
                 </div>
               </th>
-              <th>
+              <th class="patient-col">
                 <div class="header-help" @click.stop>
                   <span>Пациент</span>
                   <button
@@ -65,7 +65,7 @@
                   </div>
                 </div>
               </th>
-              <th class="wide-col">
+              <th class="research-col">
                 <div class="header-help" @click.stop>
                   <span>Исследование</span>
                   <button
@@ -84,7 +84,7 @@
                   </div>
                 </div>
               </th>
-              <th class="narrow-col">
+              <th class="number-col">
                 <div class="header-help" @click.stop>
                   <span>№</span>
                   <button
@@ -103,7 +103,7 @@
                   </div>
                 </div>
               </th>
-              <th class="narrow-col">
+              <th class="date-col">
                 <div class="header-help" @click.stop>
                   <span>Дата</span>
                   <button
@@ -119,7 +119,7 @@
                   </div>
                 </div>
               </th>
-              <th>
+              <th class="age-col">
                 <div class="header-help" @click.stop>
                   <span>Возраст</span>
                   <button
@@ -135,7 +135,7 @@
                   </div>
                 </div>
               </th>
-              <th class="compact-col">
+              <th class="diagnosis-col">
                 <div class="header-help" @click.stop>
                   <span>Основной диагноз</span>
                   <button
@@ -154,7 +154,7 @@
                   </div>
                 </div>
               </th>
-              <th class="compact-col">
+              <th class="comorbid-col">
                 <div class="header-help" @click.stop>
                   <span>Сопутствующие диагнозы</span>
                   <button
@@ -185,7 +185,7 @@
               @click="selectVisit(visit.visitId)"
             >
               <td class="id-col">{{ visit.visitId }}</td>
-              <td>
+              <td class="patient-col">
                 <div class="barcode-cell">
                   <BarcodeSvg
                     :value="getPatientBarcodeValue(visit.patientId)"
@@ -193,11 +193,11 @@
                   <span>{{ getPatientDisplay(visit.patientId) }}</span>
                 </div>
               </td>
-              <td class="wrap-cell wide-col">
+              <td class="wrap-cell research-col">
                 {{ getResearchName(visit.researchId) }}
               </td>
-              <td class="narrow-col">{{ visit.visitNumber }}</td>
-              <td class="narrow-col">
+              <td class="number-col">{{ visit.visitNumber }}</td>
+              <td class="date-col">
                 <div class="date-cell">
                   <div>{{ formatDateOnly(visit.collectionDate) }}</div>
                   <div
@@ -208,11 +208,11 @@
                   </div>
                 </div>
               </td>
-              <td>{{ visit.ageAtCollection }}</td>
-              <td class="wrap-cell compact-col">
+              <td class="age-col">{{ visit.ageAtCollection }}</td>
+              <td class="wrap-cell diagnosis-col">
                 {{ getDiagnosisDisplay(visit.diagnosisId) }}
               </td>
-              <td class="wrap-cell compact-col comorbid-cell">
+              <td class="wrap-cell comorbid-col comorbid-cell">
                 {{ getComorbidDiagnosesDisplay(visit) }}
               </td>
               <td class="action-col">
@@ -469,24 +469,6 @@
           </button>
         </div>
         <form class="form-grid" @submit.prevent="submitDiagnosisModal">
-          <div class="form-group">
-            <label for="refDiagnosisSelect">Существующая запись</label>
-            <select
-              id="refDiagnosisSelect"
-              v-model.number="refDiagnosisId"
-              class="form-control"
-              @change="fillDiagnosisModal"
-            >
-              <option :value="null">Не выбрано</option>
-              <option
-                v-for="diagnosis in diagnoses"
-                :key="diagnosis.diagnosisId"
-                :value="diagnosis.diagnosisId"
-              >
-                {{ diagnosis.diagnosisName }}
-              </option>
-            </select>
-          </div>
           <div class="form-group">
             <label for="refIcd">Код МКБ‑10</label>
             <input
@@ -1028,7 +1010,7 @@ export default defineComponent({
 
 <style scoped>
 .visit-page {
-  max-width: 1400px;
+  max-width: 98%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -1078,6 +1060,7 @@ h2 {
 
 .visit-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.95rem;
 }
@@ -1087,12 +1070,53 @@ h2 {
   border-bottom: 1px solid var(--border);
   padding: 10px;
   text-align: left;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.visit-table td {
+  white-space: pre-line;
 }
 
 .visit-table .id-col {
-  width: 60px;
-  max-width: 60px;
+  width: 4%;
+  max-width: 4%;
+}
+.visit-table .patient-col {
+  width: 12%;
+  max-width: 12%;
+}
+.visit-table .research-col {
+  width: 22%;
+  max-width: 22%;
+}
+.visit-table .number-col {
+  width: 4%;
+  max-width: 4%;
+}
+.visit-table .date-col {
+  width: 8%;
+  max-width: 8%;
+}
+.visit-table .age-col {
+  width: 8%;
+  max-width: 8%;
+}
+.visit-table .diagnosis-col {
+  width: 16%;
+  max-width: 16%;
+}
+.visit-table .comorbid-col {
+  width: 16%;
+  max-width: 16%;
+}
+
+.visit-table th.action-col,
+.visit-table td.action-col {
+  width: 4%;
+  min-width: 44px;
+  max-width: 4%;
+  text-align: center;
 }
 
 .header-help {
@@ -1151,25 +1175,8 @@ h2 {
   transform: rotate(45deg);
 }
 
-.visit-table .wide-col {
-  width: 340px;
-  max-width: 340px;
-}
-
-.visit-table .narrow-col {
-  width: 90px;
-  max-width: 90px;
-}
-
-.visit-table .compact-col {
-  width: 180px;
-  max-width: 180px;
-}
-
 .visit-table td.wrap-cell {
   white-space: normal;
-  max-width: 260px;
-  word-break: break-word;
 }
 
 .visit-table td.comorbid-cell {

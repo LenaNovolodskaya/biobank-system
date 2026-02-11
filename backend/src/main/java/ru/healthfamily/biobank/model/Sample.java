@@ -46,7 +46,7 @@ public class Sample {
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "expiry_status", columnDefinition = "expiry_status_type")
+    @Column(name = "expiry_status", columnDefinition = "expirystatus")
     private ExpiryStatus expiryStatus = ExpiryStatus.GREEN;
 
     @Column(name = "container_id")

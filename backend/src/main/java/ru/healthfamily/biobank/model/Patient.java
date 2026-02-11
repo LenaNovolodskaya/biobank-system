@@ -27,7 +27,7 @@ public class Patient {
     
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "gender", columnDefinition = "gender_code_type")
+    @Column(name = "gender", columnDefinition = "gender")
     private Gender gender = Gender.UNKNOWN;
     
     @Column(name = "birth_date", nullable = false)

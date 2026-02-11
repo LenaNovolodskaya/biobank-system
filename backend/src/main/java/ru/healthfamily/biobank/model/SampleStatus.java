@@ -22,6 +22,6 @@ public class SampleStatus {
     @Column(name = "sample_status_id")
     private Long sampleStatusId;
 
-    @Column(name = "sample_status_name", nullable = false)
+    @Column(name = "sample_status_name", nullable = false, unique = true)
     private String sampleStatusName;
 }

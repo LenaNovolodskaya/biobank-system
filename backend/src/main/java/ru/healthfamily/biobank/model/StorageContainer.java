@@ -41,4 +41,8 @@ public class StorageContainer {
 
     @Column(name = "current_samples_count", nullable = false)
     private Integer currentSamplesCount = 0;
+
+    /** Тип нумерации: LETTER_DIGIT (A1), DIGIT_LETTER (1A), DIGIT_DIGIT (1/1), SEQUENTIAL (1-25) */
+    @Column(name = "numbering_type", length = 20)
+    private String numberingType;
 }

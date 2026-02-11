@@ -316,24 +316,6 @@
         </div>
         <form class="form-grid" @submit.prevent="submitRefModal">
           <div class="form-group">
-            <label for="refSelect">Существующая запись</label>
-            <select
-              id="refSelect"
-              v-model.number="refNationalityId"
-              class="form-control"
-              @change="fillRefModalName"
-            >
-              <option :value="null">Не указано</option>
-              <option
-                v-for="nationality in nationalities"
-                :key="nationality.nationalityId"
-                :value="nationality.nationalityId"
-              >
-                {{ nationality.nationalityName }}
-              </option>
-            </select>
-          </div>
-          <div class="form-group">
             <label for="refName">Название</label>
             <input
               id="refName"
@@ -363,24 +345,6 @@
           </button>
         </div>
         <form class="form-grid" @submit.prevent="submitDiagnosisModal">
-          <div class="form-group">
-            <label for="diagSelect">Существующая запись</label>
-            <select
-              id="diagSelect"
-              v-model.number="diagDiagnosisId"
-              class="form-control"
-              @change="fillDiagnosisModal"
-            >
-              <option :value="null">Не выбрано</option>
-              <option
-                v-for="diagnosis in diagnoses"
-                :key="diagnosis.diagnosisId"
-                :value="diagnosis.diagnosisId"
-              >
-                {{ diagnosis.diagnosisName }}
-              </option>
-            </select>
-          </div>
           <div class="form-group">
             <label for="diagIcd">Код МКБ‑10</label>
             <input
@@ -905,7 +869,7 @@ export default defineComponent({
 
 <style scoped>
 .patient-list-container {
-  max-width: 1200px;
+  max-width: 98%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -982,12 +946,15 @@ h2 {
 
 .patients-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fill, 400px);
   gap: 20px;
   margin-top: 20px;
+  justify-content: center;
 }
 
 .patient-card {
+  width: 400px;
+  box-sizing: border-box;
   background-color: var(--surface);
   padding: 20px;
   border-radius: 8px;

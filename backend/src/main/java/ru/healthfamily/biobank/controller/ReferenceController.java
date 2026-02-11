@@ -3,6 +3,7 @@ package ru.healthfamily.biobank.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import ru.healthfamily.biobank.model.ContainerTypeTemplate;
 import ru.healthfamily.biobank.model.Nationality;
 import ru.healthfamily.biobank.model.Department;
 import ru.healthfamily.biobank.model.Diagnosis;
@@ -13,6 +14,7 @@ import ru.healthfamily.biobank.model.SampleType;
 import ru.healthfamily.biobank.repository.DepartmentRepository;
 import ru.healthfamily.biobank.repository.DiagnosisRepository;
 import ru.healthfamily.biobank.repository.FinancingSourceRepository;
+import ru.healthfamily.biobank.repository.ContainerTypeTemplateRepository;
 import ru.healthfamily.biobank.repository.NationalityRepository;
 import ru.healthfamily.biobank.repository.ResearchGroupRepository;
 import ru.healthfamily.biobank.repository.SampleStatusRepository;
@@ -25,6 +27,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ReferenceController {
     
+    private final ContainerTypeTemplateRepository containerTypeTemplateRepository;
     private final NationalityRepository nationalityRepository;
     private final SampleTypeRepository sampleTypeRepository;
     private final SampleStatusRepository sampleStatusRepository;
@@ -64,6 +67,11 @@ public class ReferenceController {
         return ResponseEntity.noContent().build();
     }
     
+    @GetMapping("/container-templates")
+    public ResponseEntity<List<ContainerTypeTemplate>> getContainerTemplates() {
+        return ResponseEntity.ok(containerTypeTemplateRepository.findAllByOrderByDisplayOrderAsc());
+    }
+
     @GetMapping("/genders")
     public ResponseEntity<List<String>> getAllGenders() {
         List<String> genders = List.of("UNKNOWN", "MALE", "FEMALE");
@@ -73,6 +81,34 @@ public class ReferenceController {
     @GetMapping("/sample-types")
     public ResponseEntity<List<SampleType>> getSampleTypes() {
         return ResponseEntity.ok(sampleTypeRepository.findAll());
+    }
+
+    @PostMapping("/sample-types")
+    public ResponseEntity<SampleType> createSampleType(@RequestBody Map<String, String> body) {
+        String name = body.getOrDefault("name", "").trim();
+        String iconPath = body.getOrDefault("iconPath", "").trim();
+        SampleType type = new SampleType();
+        type.setSampleTypeName(name);
+        type.setIconPath(iconPath.isEmpty() ? null : iconPath);
+        return ResponseEntity.ok(sampleTypeRepository.save(type));
+    }
+
+    @PutMapping("/sample-types/{id}")
+    public ResponseEntity<SampleType> updateSampleType(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body
+    ) {
+        SampleType type = sampleTypeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Тип образца не найден"));
+        type.setSampleTypeName(body.getOrDefault("name", "").trim());
+        type.setIconPath(body.getOrDefault("iconPath", "").trim().isEmpty() ? null : body.getOrDefault("iconPath", "").trim());
+        return ResponseEntity.ok(sampleTypeRepository.save(type));
+    }
+
+    @DeleteMapping("/sample-types/{id}")
+    public ResponseEntity<Void> deleteSampleType(@PathVariable Long id) {
+        sampleTypeRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/sample-statuses")

@@ -16,4 +16,5 @@ public class StorageContainerDTO {
     private Integer columnsCount;
     private Integer maxSamplesCount;
     private Integer currentSamplesCount;
+    private String numberingType;
 }

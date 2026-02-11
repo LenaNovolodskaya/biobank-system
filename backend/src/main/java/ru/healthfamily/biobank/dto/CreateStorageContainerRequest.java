@@ -13,6 +13,9 @@ public class CreateStorageContainerRequest {
 
     private Integer containerNumber;
 
+    /** LETTER_DIGIT, DIGIT_LETTER, DIGIT_DIGIT, SEQUENTIAL */
+    private String numberingType;
+
     @Min(value = 1, message = "Количество строк должно быть больше 0")
     private Integer rowsCount;
 

@@ -248,7 +248,7 @@ export default defineComponent({
 
 <style scoped>
 .add-patient-container {
-  max-width: 860px;
+  max-width: 100%;
   margin: 0 auto;
   padding: 20px;
 }
