@@ -949,8 +949,8 @@ h2 {
   max-width: 10%;
 }
 .research-table .name-col {
-  width: 25%;
-  max-width: 25%;
+  width: 24%;
+  max-width: 24%;
 }
 .research-table .group-col {
   width: 20%;
@@ -965,8 +965,8 @@ h2 {
   max-width: 15%;
 }
 .research-table .active-col {
-  width: 7%;
-  max-width: 7%;
+  width: 8%;
+  max-width: 8%;
 }
 
 .research-table th.action-col,

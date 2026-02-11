@@ -946,14 +946,13 @@ h2 {
 
 .patients-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, 400px);
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
   gap: 20px;
   margin-top: 20px;
-  justify-content: center;
 }
 
 .patient-card {
-  width: 400px;
+  min-width: 0;
   box-sizing: border-box;
   background-color: var(--surface);
   padding: 20px;

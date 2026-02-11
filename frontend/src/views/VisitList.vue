@@ -1079,20 +1079,20 @@ h2 {
 }
 
 .visit-table .id-col {
-  width: 4%;
-  max-width: 4%;
+  width: 5;
+  max-width: 5%;
 }
 .visit-table .patient-col {
   width: 12%;
   max-width: 12%;
 }
 .visit-table .research-col {
-  width: 22%;
-  max-width: 22%;
+  width: 20%;
+  max-width: 20%;
 }
 .visit-table .number-col {
-  width: 4%;
-  max-width: 4%;
+  width: 5%;
+  max-width: 5%;
 }
 .visit-table .date-col {
   width: 8%;

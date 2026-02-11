@@ -1,5 +1,6 @@
 package ru.healthfamily.biobank.service;
 
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -8,9 +9,11 @@ import ru.healthfamily.biobank.dto.CreateSampleRequest;
 import ru.healthfamily.biobank.dto.SampleDTO;
 import ru.healthfamily.biobank.model.Aliquot;
 import ru.healthfamily.biobank.model.Sample;
+import ru.healthfamily.biobank.model.SampleStatus;
 import ru.healthfamily.biobank.model.Sample.ExpiryStatus;
 import ru.healthfamily.biobank.repository.AliquotRepository;
 import ru.healthfamily.biobank.repository.SampleRepository;
+import ru.healthfamily.biobank.repository.SampleStatusRepository;
 import ru.healthfamily.biobank.repository.VisitRepository;
 
 import java.time.LocalDate;
@@ -26,9 +29,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SampleService {
 
+    private static final String IN_STORAGE_STATUS_NAME = "В хранилище";
+
     private final SampleRepository sampleRepository;
     private final AliquotRepository aliquotRepository;
+    private final SampleStatusRepository sampleStatusRepository;
     private final VisitRepository visitRepository;
+    private final EntityManager entityManager;
 
     @Transactional
     public List<SampleDTO> getSamples(
@@ -113,7 +120,6 @@ public class SampleService {
         sample.setBarcode(request.getBarcode());
         sample.setSampleTypeId(request.getSampleTypeId());
         sample.setInitialQuantity(request.getInitialQuantity());
-        sample.setCurrentQuantity(request.getCurrentQuantity());
         sample.setRecommendedStorageMonths(request.getRecommendedStorageMonths());
         if (request.getCollectionDate() != null) {
             sample.setCreatedAtSample(request.getCollectionDate());
@@ -127,6 +133,7 @@ public class SampleService {
         applyStorageStatus(sample);
 
         sample.getAliquots().clear();
+        entityManager.flush();
         if (request.getAliquots() != null && !request.getAliquots().isEmpty()) {
             for (CreateSampleRequest.AliquotItem item : request.getAliquots()) {
                 Aliquot aliquot = new Aliquot();
@@ -138,6 +145,17 @@ public class SampleService {
                 sample.getAliquots().add(aliquot);
             }
         }
+        Long inStorageStatusId = getInStorageStatusId();
+        int currentQty = (int) sample.getAliquots().stream()
+                .filter(a -> inStorageStatusId != null && inStorageStatusId.equals(a.getSampleStatusId()))
+                .count();
+        sample.setCurrentQuantity(currentQty);
+    }
+
+    private Long getInStorageStatusId() {
+        return sampleStatusRepository.findBySampleStatusNameIgnoreCase(IN_STORAGE_STATUS_NAME)
+                .map(SampleStatus::getSampleStatusId)
+                .orElse(null);
     }
 
     private void applyStorageStatus(Sample sample) {
@@ -178,13 +196,17 @@ public class SampleService {
                         a.getPositionInContainer()
                 ))
                 .collect(Collectors.toList());
+        Long inStorageStatusId = getInStorageStatusId();
+        int currentQuantity = (int) aliquots.stream()
+                .filter(a -> inStorageStatusId != null && inStorageStatusId.equals(a.getSampleStatusId()))
+                .count();
         return new SampleDTO(
                 sample.getSampleId(),
                 sample.getVisitId(),
                 sample.getBarcode(),
                 sample.getSampleTypeId(),
                 sample.getInitialQuantity(),
-                sample.getCurrentQuantity(),
+                currentQuantity,
                 sample.getRecommendedStorageMonths(),
                 sample.getActualStorageMonths(),
                 sample.getExpiryStatus(),

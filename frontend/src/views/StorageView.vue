@@ -308,6 +308,58 @@
                   {{ containerPath(container, shelf.label) }}
                 </div>
                 <div
+                  v-if="container.numberingType === 'SEQUENTIAL'"
+                  class="scheme-grid scheme-grid-sequential"
+                  :style="{
+                    gridTemplateColumns: `repeat(${containerGridColumns(
+                      container
+                    )}, var(--cell-size))`,
+                    gridTemplateRows: `repeat(${containerGridRows(
+                      container
+                    )}, calc(var(--cell-label-height) + var(--cell-size))`,
+                  }"
+                >
+                  <template
+                    v-for="row in containerGridRows(container)"
+                    :key="`row-${row}`"
+                  >
+                    <div
+                      v-for="cell in containerRowCells(container, row)"
+                      :key="cell.label"
+                      class="scheme-cell-sequential-wrapper"
+                    >
+                      <div class="scheme-cell-label-above">
+                        {{ cell.label }}
+                      </div>
+                      <div
+                        class="scheme-cell"
+                        :class="{
+                          filled: cell.filled,
+                          'filled-with-icon':
+                            cell.filled && !!cell.sampleTypeIconUrl,
+                          'expiry-green': cell.expiryStatus === 'GREEN',
+                          'expiry-yellow': cell.expiryStatus === 'YELLOW',
+                          'expiry-red': cell.expiryStatus === 'RED',
+                        }"
+                        :title="cell.sampleBarcode || ''"
+                        @click="onCellClick(container, cell)"
+                      >
+                        <div
+                          v-if="cell.filled && cell.sampleTypeIconUrl"
+                          class="scheme-cell-icon-wrap"
+                        >
+                          <img
+                            :src="cell.sampleTypeIconUrl"
+                            class="scheme-cell-icon"
+                            :alt="''"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+                <div
+                  v-else
                   class="scheme-grid"
                   :style="{
                     gridTemplateColumns: `auto repeat(${containerGridColumns(
@@ -431,9 +483,18 @@
                 class="detail-item"
               >
                 <span>{{ field.label }}</span>
-                <strong>{{
+                <strong v-if="field.key !== 'barcode'">{{
                   formatSampleValue(selectedSample, field.key)
                 }}</strong>
+                <div v-else class="drawer-barcode-block">
+                  <BarcodeSvg
+                    v-if="getDisplayBarcode()"
+                    :value="getDisplayBarcode()"
+                  />
+                  <div class="drawer-barcode-text">
+                    {{ getDisplayBarcode() || "—" }}
+                  </div>
+                </div>
               </div>
             </div>
             <div v-else class="empty-state">Данные об образце не найдены.</div>
@@ -830,6 +891,7 @@
 <script lang="ts">
 import { defineComponent } from "vue";
 import axios from "axios";
+import BarcodeSvg from "@/components/BarcodeSvg.vue";
 
 interface StorageContainer {
   containerId: number;
@@ -962,6 +1024,9 @@ interface NewContainerForm {
 
 export default defineComponent({
   name: "StorageView",
+  components: {
+    BarcodeSvg,
+  },
   data() {
     return {
       locations: [] as StorageLocation[],
@@ -1014,6 +1079,7 @@ export default defineComponent({
       drawerFormInitializing: false,
       selectedCell: null as { containerId: number; label: string } | null,
       selectedSample: null as Sample | null,
+      selectedAliquot: null as Aliquot | null,
       drawerSampleForm: {
         visitId: null as number | null,
         barcode: "",
@@ -1221,22 +1287,22 @@ export default defineComponent({
     sampleDetailFields(): Array<{ key: string; label: string }> {
       return [
         { key: "barcode", label: "Штрихкод" },
-        { key: "researchInfo", label: "Исследование" },
+        { key: "sampleTypeId", label: "Тип" },
+        { key: "containerId", label: "Контейнер" },
+        { key: "initialQuantity", label: "Начальное кол-во" },
+        { key: "currentQuantity", label: "Текущее кол-во" },
+        { key: "createdAtSample", label: "Дата забора" },
+        { key: "actualStorageMonths", label: "Факт. хранение" },
+        { key: "recommendedStorageMonths", label: "Рек. хранение" },
+        { key: "expiryStatus", label: "Срок хранения" },
         { key: "patientAge", label: "Возраст" },
         { key: "mainDiagnosis", label: "Основной диагноз" },
         { key: "patientGender", label: "Пол" },
         { key: "patientBirthDate", label: "Дата рождения" },
         { key: "patientNationality", label: "Национальность" },
-        { key: "sampleTypeId", label: "Тип" },
-        { key: "initialQuantity", label: "Начальное кол-во" },
-        { key: "currentQuantity", label: "Текущее кол-во" },
-        { key: "recommendedStorageMonths", label: "Рек. хранение" },
-        { key: "actualStorageMonths", label: "Факт. хранение" },
-        { key: "expiryStatus", label: "Срок хранения" },
-        { key: "containerId", label: "Контейнер" },
+        { key: "researchInfo", label: "Исследование" },
         { key: "positionInContainer", label: "Позиция" },
         { key: "sampleStatusId", label: "Статус" },
-        { key: "createdAtSample", label: "Создан" },
       ];
     },
   },
@@ -1488,6 +1554,24 @@ export default defineComponent({
       });
       return map;
     },
+    getContainerCellMap(container: StorageContainer) {
+      const samples = this.getSamplesForContainer(container.containerId);
+      const map = new Map<string, { sample: Sample; aliquot: Aliquot }>();
+      samples.forEach((sample) => {
+        (sample.aliquots || []).forEach((a) => {
+          if (
+            a.containerId === container.containerId &&
+            a.positionInContainer
+          ) {
+            const label = a.positionInContainer.trim();
+            if (label && !map.has(label)) {
+              map.set(label, { sample, aliquot: a });
+            }
+          }
+        });
+      });
+      return map;
+    },
     containerGridColumns(container: StorageContainer): number {
       const { columns } = this.resolveContainerLayout(container);
       return columns || 1;
@@ -1518,7 +1602,7 @@ export default defineComponent({
       if (!columns) {
         return [];
       }
-      const filled = this.getContainerSampleMap(container);
+      const cellMap = this.getContainerCellMap(container);
       return Array.from({ length: columns }, (_, i) => {
         const column = i + 1;
         const label = this.getPositionLabelForCell(
@@ -1527,15 +1611,17 @@ export default defineComponent({
           column,
           columns
         );
-        const sample = filled.get(label);
+        const cellData = cellMap.get(label);
         return {
           label,
-          filled: filled.has(label),
-          sampleBarcode: sample?.barcode,
-          sampleTypeIconUrl: sample
-            ? this.getSampleTypeIconUrl(sample.sampleTypeId)
+          filled: cellMap.has(label),
+          sampleBarcode: cellData?.aliquot.barcode ?? cellData?.sample.barcode,
+          sampleTypeIconUrl: cellData?.sample
+            ? this.getSampleTypeIconUrl(cellData.sample.sampleTypeId)
             : undefined,
-          expiryStatus: sample ? this.getSampleExpiryStatus(sample) : undefined,
+          expiryStatus: cellData?.sample
+            ? this.getSampleExpiryStatus(cellData.sample)
+            : undefined,
         };
       });
     },
@@ -1728,7 +1814,23 @@ export default defineComponent({
         .map((item) => Number(item.trim()))
         .filter((item) => Number.isFinite(item));
     },
+    getDisplayBarcode(): string {
+      if (this.selectedAliquot?.barcode?.trim()) {
+        return this.selectedAliquot.barcode.trim();
+      }
+      return this.selectedSample?.barcode?.trim() || "";
+    },
     formatSampleValue(sample: Sample, key: string) {
+      const aliquot = this.selectedAliquot;
+      if (key === "barcode" && aliquot) {
+        return aliquot.barcode?.trim() || "—";
+      }
+      if (key === "positionInContainer" && aliquot) {
+        return aliquot.positionInContainer?.trim() || "—";
+      }
+      if (key === "sampleStatusId" && aliquot) {
+        return this.getSampleStatusName(aliquot.sampleStatusId);
+      }
       if (key === "expiryStatus") {
         return this.getExpiryStatusLabel(this.getSampleExpiryStatus(sample));
       }
@@ -1774,6 +1876,11 @@ export default defineComponent({
       }
       if (key === "actualStorageMonths") {
         return this.calculateActualMonths(sample.createdAtSample);
+      }
+      if (key === "createdAtSample") {
+        return sample.createdAtSample
+          ? this.formatDate(sample.createdAtSample)
+          : "—";
       }
       if (key === "containerId") {
         return this.getContainerLabel(sample.containerId);
@@ -1906,6 +2013,21 @@ export default defineComponent({
         ) || null
       );
     },
+    findAliquotForCell(
+      container: StorageContainer,
+      label: string
+    ): Aliquot | null {
+      const samples = this.getSamplesForContainer(container.containerId);
+      for (const sample of samples) {
+        const aliquot = (sample.aliquots || []).find(
+          (a) =>
+            a.containerId === container.containerId &&
+            a.positionInContainer?.trim() === label
+        );
+        if (aliquot) return aliquot;
+      }
+      return null;
+    },
     openSampleDetails(
       containerId: number,
       label: string,
@@ -1915,6 +2037,11 @@ export default defineComponent({
       this.sampleDrawerMode = "details";
       this.selectedCell = { containerId, label };
       this.selectedSample = sample;
+      const container = this.containerRefs.find(
+        (c) => c.containerId === containerId
+      );
+      this.selectedAliquot =
+        container && sample ? this.findAliquotForCell(container, label) : null;
       if (!sample) {
         this.errorMessage = "Образец для позиции не найден.";
       }
@@ -1924,6 +2051,7 @@ export default defineComponent({
       this.sampleDrawerMode = "create";
       this.selectedCell = { containerId, label };
       this.selectedSample = null;
+      this.selectedAliquot = null;
       const storageStatusId = this.getStorageStatusId();
       this.drawerSampleForm = {
         visitId: null,
@@ -1987,6 +2115,7 @@ export default defineComponent({
       this.sampleDrawerMode = null;
       this.selectedCell = null;
       this.selectedSample = null;
+      this.selectedAliquot = null;
     },
     async submitSampleDrawer() {
       this.errorMessage = "";
@@ -2976,9 +3105,14 @@ h2 {
 .scheme-grid {
   display: grid;
   --cell-size: 36px;
+  --cell-label-height: 14px;
   gap: 8px;
   align-items: center;
   width: var(--grid-width);
+}
+
+.scheme-grid-sequential {
+  align-items: stretch;
 }
 
 .scheme-grid-corner {
@@ -2997,6 +3131,23 @@ h2 {
   text-align: right;
   padding-right: 6px;
   justify-self: end;
+}
+
+.scheme-cell-sequential-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.scheme-cell-label-above {
+  font-size: 0.7rem;
+  line-height: 1;
+  color: var(--text-secondary);
+  min-height: var(--cell-label-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .scheme-cell {
@@ -3135,6 +3286,17 @@ h2 {
 .detail-item strong {
   color: var(--text-primary);
   font-weight: 600;
+}
+
+.drawer-barcode-block {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.drawer-barcode-text {
+  font-size: 0.9rem;
+  color: var(--text-primary);
 }
 
 .tube-grid {
