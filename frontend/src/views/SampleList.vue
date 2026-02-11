@@ -25,17 +25,7 @@
     <div class="card filters-card">
       <div class="filters">
         <div class="form-group">
-          <label for="search">Поиск</label>
-          <input
-            id="search"
-            v-model="searchQuery"
-            type="text"
-            class="form-control"
-            placeholder="Штрихкод, ID, позиция"
-          />
-        </div>
-        <div class="form-group">
-          <label for="expiry">Срок хранения</label>
+          <label for="expiry">Срок годности</label>
           <select id="expiry" v-model="expiryStatus" class="form-control">
             <option value="">Все</option>
             <option value="GREEN">Годен</option>
@@ -44,15 +34,36 @@
           </select>
         </div>
         <div class="form-group">
-          <label for="container">Контейнер</label>
-          <select id="container" v-model="containerFilter" class="form-control">
-            <option value="">Все</option>
+          <label for="researchFilter">Исследование</label>
+          <select
+            id="researchFilter"
+            v-model="researchFilter"
+            class="form-control"
+          >
+            <option :value="null">Все</option>
             <option
-              v-for="container in containers"
-              :key="container.containerId"
-              :value="getContainerLabel(container.containerId)"
+              v-for="r in researches"
+              :key="r.researchId"
+              :value="r.researchId"
             >
-              {{ getContainerLabel(container.containerId) }}
+              {{ getResearchLabel(r.researchId) }}
+            </option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="mainDiagnosisFilter">Основной диагноз</label>
+          <select
+            id="mainDiagnosisFilter"
+            v-model="mainDiagnosisFilter"
+            class="form-control"
+          >
+            <option :value="null">Все</option>
+            <option
+              v-for="d in diagnoses"
+              :key="d.diagnosisId"
+              :value="d.diagnosisId"
+            >
+              {{ getDiagnosisDisplay(d.diagnosisId) }}
             </option>
           </select>
         </div>
@@ -74,34 +85,26 @@
           </select>
         </div>
         <div class="form-group">
-          <label for="sampleStatus">Статус образца</label>
-          <select
-            id="sampleStatus"
-            v-model="sampleStatusFilter"
+          <label for="ageMin">Возраст от</label>
+          <input
+            id="ageMin"
+            v-model.number="ageMinFilter"
+            type="number"
+            min="0"
             class="form-control"
-          >
-            <option value="">Все</option>
-            <option
-              v-for="status in sampleStatuses"
-              :key="status.sampleStatusId"
-              :value="status.sampleStatusName"
-            >
-              {{ status.sampleStatusName }}
-            </option>
-          </select>
+            placeholder="—"
+          />
         </div>
         <div class="form-group">
-          <label for="visitId">Визит</label>
-          <select id="visitId" v-model="visitFilter" class="form-control">
-            <option value="">Все</option>
-            <option
-              v-for="visit in visits"
-              :key="visit.visitId"
-              :value="getVisitLabel(visit.visitId)"
-            >
-              {{ getVisitLabel(visit.visitId) }}
-            </option>
-          </select>
+          <label for="ageMax">Возраст до</label>
+          <input
+            id="ageMax"
+            v-model.number="ageMaxFilter"
+            type="number"
+            min="0"
+            class="form-control"
+            placeholder="—"
+          />
         </div>
         <div class="form-actions">
           <button class="btn btn-secondary" @click="resetFilters">Сброс</button>
@@ -129,68 +132,116 @@
       <div v-else-if="filteredSamples.length === 0" class="empty-state">
         Нет образцов по заданным условиям
       </div>
-      <div v-else class="table-wrapper">
+      <div v-else class="table-wrapper" @click="activeHeaderHelp = null">
         <table class="samples-table">
           <thead>
             <tr>
               <th v-for="column in visibleColumns" :key="column.key">
-                {{ column.label }}
+                <div class="header-help" @click.stop>
+                  <span>{{ column.label }}</span>
+                  <button
+                    v-if="headerHelp[column.key]"
+                    type="button"
+                    class="help-button"
+                    :aria-label="`Описание столбца ${column.label}`"
+                    @click.stop="toggleHeaderHelp(column.key)"
+                  >
+                    ?
+                  </button>
+                  <div
+                    v-if="activeHeaderHelp === column.key"
+                    class="help-popover"
+                  >
+                    {{ headerHelp[column.key] }}
+                  </div>
+                </div>
               </th>
               <th class="action-col"></th>
               <th class="action-col"></th>
             </tr>
           </thead>
           <tbody>
-            <tr
-              v-for="sample in filteredSamples"
-              :key="sample.sampleId"
-              :class="{ selected: sample.sampleId === selectedSampleId }"
-              @click="selectSample(sample.sampleId)"
-            >
-              <td v-for="column in visibleColumns" :key="column.key">
-                <template v-if="column.key === 'barcode'">
-                  <div class="barcode-cell">
-                    <BarcodeSvg :value="sample.barcode" />
-                    <span>{{ sample.barcode }}</span>
+            <template v-for="sample in filteredSamples" :key="sample.sampleId">
+              <tr
+                :class="{ selected: sample.sampleId === selectedSampleId }"
+                @click="selectSample(sample.sampleId)"
+              >
+                <td v-for="column in visibleColumns" :key="column.key">
+                  <template v-if="column.key === 'barcode'">
+                    <div class="barcode-cell">
+                      <BarcodeSvg :value="sample.barcode" />
+                      <span>{{ sample.barcode }}</span>
+                    </div>
+                  </template>
+                  <template v-else>
+                    {{ formatValue(sample, column.key) }}
+                  </template>
+                </td>
+                <td class="action-col">
+                  <button
+                    class="icon-button"
+                    type="button"
+                    aria-label="Обновить"
+                    title="Обновить"
+                    @click.stop="editSampleRow(sample.sampleId)"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </button>
+                </td>
+                <td class="action-col">
+                  <button
+                    class="icon-button danger"
+                    type="button"
+                    aria-label="Удалить"
+                    title="Удалить"
+                    @click.stop="deleteSampleRow(sample.sampleId)"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2H8l1-2z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </button>
+                </td>
+              </tr>
+              <tr
+                v-if="sample.sampleId === selectedSampleId"
+                class="aliquots-details-row"
+              >
+                <td :colspan="visibleColumns.length + 2" class="aliquots-cell">
+                  <div class="aliquots-header">Аликвоты:</div>
+                  <div
+                    v-if="getSampleAliquots(sample).length === 0"
+                    class="aliquots-empty"
+                  >
+                    Нет аликвот
                   </div>
-                </template>
-                <template v-else>
-                  {{ formatValue(sample, column.key) }}
-                </template>
-              </td>
-              <td class="action-col">
-                <button
-                  class="icon-button"
-                  type="button"
-                  aria-label="Обновить"
-                  title="Обновить"
-                  @click.stop="editSampleRow(sample.sampleId)"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path
-                      d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25z"
-                      fill="currentColor"
-                    />
-                  </svg>
-                </button>
-              </td>
-              <td class="action-col">
-                <button
-                  class="icon-button danger"
-                  type="button"
-                  aria-label="Удалить"
-                  title="Удалить"
-                  @click.stop="deleteSampleRow(sample.sampleId)"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path
-                      d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2H8l1-2z"
-                      fill="currentColor"
-                    />
-                  </svg>
-                </button>
-              </td>
-            </tr>
+                  <div
+                    v-for="aliquot in getSampleAliquots(sample)"
+                    :key="aliquot.aliquotId"
+                    class="aliquot-row"
+                  >
+                    <BarcodeSvg :value="aliquot.barcode" />
+                    <span class="aliquot-barcode">{{ aliquot.barcode }}</span>
+                    <span class="aliquot-status">{{
+                      getSampleStatusName(aliquot.sampleStatusId)
+                    }}</span>
+                    <span class="aliquot-position">{{
+                      aliquot.positionInContainer || "—"
+                    }}</span>
+                    <span v-if="aliquot.containerId" class="aliquot-container">
+                      {{ getContainerLabel(aliquot.containerId) }}
+                    </span>
+                  </div>
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -312,13 +363,23 @@
               </option>
             </select>
           </div>
-          <div class="form-group">
-            <label>Пробирки</label>
-            <div v-if="tubeCount > 0" class="tube-grid">
-              <div v-for="index in tubeCount" :key="index" class="tube-row">
-                <div class="tube-label">Пробирка {{ index }}</div>
+          <div class="form-group aliquots-form-group">
+            <label>Аликвоты</label>
+            <div v-if="tubeCount > 0" class="aliquots-form-grid">
+              <div
+                v-for="(aliquot, index) in modalSample.aliquots"
+                :key="index"
+                class="aliquot-form-row"
+              >
+                <div class="aliquot-form-label">Аликвота {{ index + 1 }}</div>
+                <input
+                  v-model="aliquot.barcode"
+                  type="text"
+                  class="form-control"
+                  placeholder="Штрихкод аликвоты"
+                />
                 <select
-                  v-model.number="tubeStatusIds[index - 1]"
+                  v-model.number="aliquot.sampleStatusId"
                   class="form-control"
                 >
                   <option :value="null">Не указано</option>
@@ -331,24 +392,42 @@
                   </option>
                 </select>
                 <select
-                  v-model="tubePositions[index - 1]"
+                  v-model.number="aliquot.containerId"
                   class="form-control"
-                  :disabled="!modalSample.containerId"
+                >
+                  <option :value="null">Не указано</option>
+                  <option
+                    v-for="c in containers"
+                    :key="c.containerId"
+                    :value="c.containerId"
+                  >
+                    {{ c.containerType || "Контейнер" }} №{{
+                      c.containerNumber ?? "—"
+                    }}
+                  </option>
+                </select>
+                <select
+                  v-model="aliquot.positionInContainer"
+                  class="form-control"
+                  :disabled="!aliquot.containerId"
                 >
                   <option value="">Не указано</option>
                   <option
-                    v-for="position in positionsForContainer"
-                    :key="position.value"
-                    :value="position.value"
-                    :disabled="isPositionDisabled(position, index - 1)"
+                    v-for="pos in positionsForAliquotContainer(
+                      aliquot.containerId,
+                      index
+                    )"
+                    :key="pos.value"
+                    :value="pos.value"
+                    :disabled="pos.disabled"
                   >
-                    {{ position.value }}
+                    {{ pos.value }}
                   </option>
                 </select>
               </div>
             </div>
             <div v-else class="readonly-field">
-              Укажите количество пробирок.
+              Укажите начальное количество аликвот.
             </div>
           </div>
           <div class="form-actions">
@@ -367,6 +446,15 @@ import { defineComponent } from "vue";
 import axios from "axios";
 import BarcodeSvg from "@/components/BarcodeSvg.vue";
 
+interface Aliquot {
+  aliquotId: number;
+  barcode: string;
+  sampleId: number;
+  sampleStatusId: number | null;
+  containerId: number | null;
+  positionInContainer: string | null;
+}
+
 interface Sample {
   sampleId: number;
   visitId: number;
@@ -377,17 +465,22 @@ interface Sample {
   recommendedStorageMonths: number | null;
   actualStorageMonths: number | null;
   expiryStatus: string;
-  sampleStatusId: number | null;
-  tubeStatusIds?: string | null;
   containerId: number | null;
-  positionInContainer: string | null;
   createdAtSample: string;
+  aliquots?: Aliquot[];
 }
 
 interface ColumnConfig {
   key: string;
   label: string;
   visible: boolean;
+}
+
+interface AliquotFormItem {
+  barcode: string;
+  sampleStatusId: number | null;
+  containerId: number | null;
+  positionInContainer: string;
 }
 
 interface SampleForm {
@@ -399,10 +492,9 @@ interface SampleForm {
   recommendedStorageMonths: number | null;
   actualStorageMonths: number | null;
   expiryStatus: string;
-  sampleStatusId: number | null;
   containerId: number | null;
-  positionInContainer: string;
   collectionDate: string;
+  aliquots: AliquotFormItem[];
 }
 
 interface VisitRef {
@@ -494,81 +586,6 @@ const getColumnLabel = (index: number): string => {
   return result;
 };
 
-const getColumnIndex = (label: string): number | null => {
-  if (!label) {
-    return null;
-  }
-  let index = 0;
-  const normalized = label.toUpperCase();
-  for (let i = 0; i < normalized.length; i += 1) {
-    const code = normalized.charCodeAt(i);
-    if (code < 65 || code > 90) {
-      return null;
-    }
-    index = index * 26 + (code - 64);
-  }
-  return index || null;
-};
-
-const normalizePositionLabel = (
-  container: ContainerRef,
-  value: string | null
-): string | null => {
-  if (!value) {
-    return null;
-  }
-  const { columns, total } = resolveContainerLayout(container);
-  if (!columns || !total) {
-    return null;
-  }
-  const trimmed = value.trim().toUpperCase();
-  const letterMatch = trimmed.match(/^([A-Z]+)(\d+)$/);
-  if (letterMatch) {
-    const column = getColumnIndex(letterMatch[1]);
-    const row = Number(letterMatch[2]);
-    if (!column || row < 1) {
-      return null;
-    }
-    const index = (row - 1) * columns + column;
-    if (index < 1 || index > total) {
-      return null;
-    }
-    return `${getColumnLabel(column)}${row}`;
-  }
-  const numeric = Number(trimmed);
-  if (!Number.isFinite(numeric) || numeric < 1) {
-    return null;
-  }
-  const index = Math.floor(numeric);
-  if (index > total) {
-    return null;
-  }
-  const row = Math.floor((index - 1) / columns) + 1;
-  const column = ((index - 1) % columns) + 1;
-  return `${getColumnLabel(column)}${row}`;
-};
-
-const splitPositionValues = (value: string | null): string[] => {
-  if (!value) {
-    return [];
-  }
-  return value
-    .split(/[,\n;]+/)
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
-};
-
-const extractPositionLabels = (
-  container: ContainerRef,
-  value: string | null
-): string[] => {
-  const parts = splitPositionValues(value);
-  const labels = parts
-    .map((part) => normalizePositionLabel(container, part))
-    .filter((label): label is string => !!label);
-  return Array.from(new Set(labels));
-};
-
 export default defineComponent({
   name: "SampleList",
   components: {
@@ -584,6 +601,7 @@ export default defineComponent({
       modalOpen: false,
       modalMode: "create" as "create" | "edit",
       modalTitle: "",
+      modalSampleInitializing: false,
       modalSample: {
         visitId: null,
         barcode: "",
@@ -593,10 +611,9 @@ export default defineComponent({
         recommendedStorageMonths: null,
         actualStorageMonths: null,
         expiryStatus: "",
-        sampleStatusId: null,
         containerId: null,
-        positionInContainer: "",
         collectionDate: "",
+        aliquots: [],
       } as SampleForm,
       visits: [] as VisitRef[],
       patients: [] as PatientRef[],
@@ -605,14 +622,12 @@ export default defineComponent({
       sampleTypes: [] as SampleTypeRef[],
       sampleStatuses: [] as SampleStatusRef[],
       containers: [] as ContainerRef[],
-      searchQuery: "",
       expiryStatus: "",
-      containerFilter: "",
+      researchFilter: null as number | null,
+      mainDiagnosisFilter: null as number | null,
       sampleTypeFilter: "",
-      sampleStatusFilter: "",
-      visitFilter: "",
-      tubeStatusIds: [] as Array<number | null>,
-      tubePositions: [] as string[],
+      ageMinFilter: null as number | null | string,
+      ageMaxFilter: null as number | null | string,
       columns: [
         { key: "barcode", label: "Штрихкод", visible: true },
         { key: "researchInfo", label: "Исследование", visible: true },
@@ -636,10 +651,34 @@ export default defineComponent({
         },
         { key: "expiryStatus", label: "Срок хранения", visible: true },
         { key: "containerId", label: "Контейнер", visible: true },
-        { key: "positionInContainer", label: "Позиция", visible: true },
-        { key: "sampleStatusId", label: "Статус", visible: true },
         { key: "createdAtSample", label: "Создан", visible: true },
       ] as ColumnConfig[],
+      headerHelp: {
+        barcode: "Штрихкод образца",
+        researchInfo: "Номер и название темы исследования",
+        patientAge: "Возраст пациента на момент забора биоматериала",
+        mainDiagnosis:
+          "Основной диагноз, поставленный пациенту, у которого взят биоматериал",
+        patientGender: "Пол пациента, у которого взят биоматериал",
+        patientBirthDate: "Дата рождения пациента, у которого взят биоматериал",
+        patientNationality:
+          "Национальность пациента, у которого взят биоматериал",
+        sampleTypeId: "Вид забранного биологического материала",
+        initialQuantity:
+          "Общее количество идентичных пробирок (аликвот), полученных от пациента и первоначально зарегистрированных в хранилище",
+        currentQuantity:
+          "Текущее количество пробирок (аликвот) данного образца, оставшихся в хранилище на данный момент",
+        recommendedStorageMonths:
+          "Срок, в течение которого образец гарантированно пригоден для анализа согласно протоколу исследования",
+        actualStorageMonths:
+          "Период времени, прошедший с момента забора биоматериала до текущей даты",
+        expiryStatus:
+          "Индикатор пригодности образца на основе сравнения фактического и рекомендованного срока (годен/истекает/просрочен)",
+        containerId: "Название и номер места долгосрочного хранения",
+        createdAtSample:
+          "Дата и точное время процедуры взятия биоматериала у пациента",
+      } as Record<string, string>,
+      activeHeaderHelp: null as string | null,
     };
   },
   computed: {
@@ -650,102 +689,56 @@ export default defineComponent({
       const quantity = Number(this.modalSample.initialQuantity || 0);
       return Number.isFinite(quantity) && quantity > 0 ? quantity : 0;
     },
-    positionsForContainer() {
-      const self = this as unknown as {
-        containers: ContainerRef[];
-        modalSample: SampleForm;
-        samples: Sample[];
-        modalMode: "create" | "edit";
-        selectedSampleId: number | null;
-        tubePositions: string[];
-      };
-      const container = self.containers.find(
-        (item) => item.containerId === self.modalSample.containerId
-      );
-      if (!container) {
-        return [];
-      }
-      const layout = resolveContainerLayout(container);
-      if (!layout.total || !layout.columns) {
-        return [];
-      }
-      const occupied = new Set<string>();
-      self.samples
-        .filter(
-          (sample: Sample) => sample.containerId === container.containerId
-        )
-        .forEach((sample: Sample) => {
-          if (
-            self.modalMode === "edit" &&
-            sample.sampleId === self.selectedSampleId
-          ) {
-            return;
-          }
-          extractPositionLabels(container, sample.positionInContainer).forEach(
-            (label) => occupied.add(label)
-          );
-        });
-      return Array.from({ length: layout.total }, (_, i) => {
-        const index = i + 1;
-        const row = Math.floor((index - 1) / layout.columns) + 1;
-        const column = ((index - 1) % layout.columns) + 1;
-        const value = `${getColumnLabel(column)}${row}`;
-        return {
-          value,
-          disabled: occupied.has(value) && !self.tubePositions.includes(value),
-        };
-      });
-    },
     actualMonthsPreview(): string {
       return this.calculateActualMonths(this.modalSample.collectionDate);
     },
     expiryPreview(): string {
-      if (!this.modalSample.recommendedStorageMonths) {
-        return "Годен";
-      }
-      const actual = Number(this.actualMonthsPreview);
-      if (Number.isNaN(actual)) {
-        return "Годен";
-      }
-      const remaining = this.modalSample.recommendedStorageMonths - actual;
-      if (remaining < 0) {
-        return "Просрочен";
-      }
-      if (remaining <= 2) {
-        return "Истекает";
-      }
-      return "Годен";
+      return this.getExpiryStatusLabel(
+        this.getExpiryStatusCode(
+          this.modalSample.collectionDate,
+          this.modalSample.recommendedStorageMonths
+        )
+      );
     },
     filteredSamples(): Sample[] {
-      const query = this.searchQuery.trim().toLowerCase();
       return this.samples.filter((sample) => {
-        const matchesQuery =
-          !query ||
-          sample.barcode?.toLowerCase().includes(query) ||
-          sample.sampleId?.toString().includes(query) ||
-          sample.positionInContainer?.toLowerCase().includes(query);
         const matchesExpiry =
-          !this.expiryStatus || sample.expiryStatus === this.expiryStatus;
-        const matchesContainer =
-          !this.containerFilter ||
-          this.getContainerLabel(sample.containerId) === this.containerFilter;
+          !this.expiryStatus ||
+          this.getSampleExpiryStatus(sample) === this.expiryStatus;
         const matchesType =
           !this.sampleTypeFilter ||
           this.getSampleTypeName(sample.sampleTypeId) === this.sampleTypeFilter;
-        const matchesStatus =
-          !this.sampleStatusFilter ||
-          this.getSampleStatusName(sample.sampleStatusId) ===
-            this.sampleStatusFilter;
-        const matchesVisit =
-          !this.visitFilter ||
-          this.getVisitLabel(sample.visitId) === this.visitFilter;
+        const visit = this.getVisitById(sample.visitId);
+        const matchesResearch =
+          this.researchFilter == null ||
+          visit?.researchId === this.researchFilter;
+        const patient = this.getPatientByVisit(sample.visitId);
+        const matchesMainDiagnosis =
+          this.mainDiagnosisFilter == null ||
+          patient?.mainDiagnosisId === this.mainDiagnosisFilter;
+        const age = visit?.ageAtCollection ?? null;
+        const minNum =
+          this.ageMinFilter === "" ||
+          this.ageMinFilter === null ||
+          this.ageMinFilter === undefined
+            ? null
+            : Number(this.ageMinFilter);
+        const maxNum =
+          this.ageMaxFilter === "" ||
+          this.ageMaxFilter === null ||
+          this.ageMaxFilter === undefined
+            ? null
+            : Number(this.ageMaxFilter);
+        const matchesAge =
+          age == null ||
+          ((minNum == null || !Number.isFinite(minNum) || age >= minNum) &&
+            (maxNum == null || !Number.isFinite(maxNum) || age <= maxNum));
         return (
-          matchesQuery &&
           matchesExpiry &&
-          matchesContainer &&
+          matchesResearch &&
+          matchesMainDiagnosis &&
           matchesType &&
-          matchesStatus &&
-          matchesVisit
+          matchesAge
         );
       });
     },
@@ -756,19 +749,22 @@ export default defineComponent({
   },
   watch: {
     "modalSample.visitId": "syncCollectionFromVisit",
-    "modalSample.containerId"() {
-      this.modalSample.positionInContainer = "";
-      this.tubePositions = [];
-      this.syncTubeArrays();
-    },
     "modalSample.initialQuantity"() {
       if (this.modalMode === "create") {
         this.modalSample.currentQuantity = this.modalSample.initialQuantity;
       }
-      this.syncTubeArrays();
+      this.syncAliquots();
+    },
+    "modalSample.barcode"() {
+      if (this.modalMode === "create" && this.tubeCount > 0) {
+        this.syncAliquots();
+      }
     },
   },
   methods: {
+    toggleHeaderHelp(key: string) {
+      this.activeHeaderHelp = this.activeHeaderHelp === key ? null : key;
+    },
     async fetchSamples() {
       this.loading = true;
       this.errorMessage = "";
@@ -862,71 +858,111 @@ export default defineComponent({
       );
     },
     calculateActualMonths(value: string | null | undefined): string {
-      if (!value) {
+      const startDate = this.getDateOnly(value);
+      const today = this.getTodayDateOnly();
+      if (!startDate || !today) {
         return "—";
       }
-      const fromDate = new Date(value);
-      if (Number.isNaN(fromDate.getTime())) {
+      if (today < startDate) {
+        return "0 мес 0 дн";
+      }
+      const diff = this.getMonthsDaysDiff(startDate, today);
+      if (!diff) {
         return "—";
       }
-      const now = new Date();
-      const months =
-        (now.getFullYear() - fromDate.getFullYear()) * 12 +
-        (now.getMonth() - fromDate.getMonth());
-      return months >= 0 ? String(months) : "—";
+      return `${diff.months} мес ${diff.days} дн`;
     },
-    syncTubeArrays() {
-      const quantity = this.tubeCount;
-      if (quantity <= 0) {
-        this.tubePositions = [];
-        this.tubeStatusIds = [];
-        return;
-      }
-      this.tubePositions = this.normalizeArray(
-        this.tubePositions,
-        quantity,
-        this.modalSample.positionInContainer || ""
-      );
-      this.tubeStatusIds = this.normalizeArray(
-        this.tubeStatusIds,
-        quantity,
-        this.modalSample.sampleStatusId ?? null
-      );
-    },
-    normalizeArray<T>(values: T[], length: number, fallback: T): T[] {
-      const result = values.slice(0, length);
-      while (result.length < length) {
-        result.push(fallback);
-      }
-      return result;
-    },
-    parseIdList(value?: string | null): number[] {
-      if (!value) return [];
-      return value
-        .split(",")
-        .map((item) => Number(item.trim()))
-        .filter((item) => Number.isFinite(item));
-    },
-    getTubeStatusLabels(sample: Sample) {
-      const tubeStatusIds = this.parseIdList(sample.tubeStatusIds);
-      if (tubeStatusIds.length === 0) {
+    getMonthsDaysDiff(startDate: Date, endDate: Date) {
+      if (endDate < startDate) {
         return null;
       }
-      const labels = tubeStatusIds.map((id) =>
-        this.getSampleStatusName(id ?? null)
-      );
-      return labels.filter((label) => label && label !== "—").join("\n");
-    },
-    isPositionDisabled(
-      position: { value: string; disabled: boolean },
-      index: number
-    ) {
-      if (position.disabled) {
-        return true;
+      let months =
+        (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+        (endDate.getMonth() - startDate.getMonth());
+      if (endDate.getDate() < startDate.getDate()) {
+        months -= 1;
       }
-      return this.tubePositions.some(
-        (value, idx) => idx !== index && value === position.value
+      const anchor = this.addMonthsClamped(startDate, months);
+      const days = Math.round(
+        (endDate.getTime() - anchor.getTime()) / (24 * 60 * 60 * 1000)
       );
+      return { months, days: Math.max(days, 0) };
+    },
+    addMonthsClamped(date: Date, monthsToAdd: number) {
+      const year = date.getFullYear();
+      const month = date.getMonth() + monthsToAdd;
+      const day = date.getDate();
+      const targetYear = year + Math.floor(month / 12);
+      const targetMonth = ((month % 12) + 12) % 12;
+      const lastDay = new Date(targetYear, targetMonth + 1, 0).getDate();
+      return new Date(targetYear, targetMonth, Math.min(day, lastDay));
+    },
+    syncAliquots() {
+      const quantity = this.tubeCount;
+      const current = this.modalSample.aliquots;
+      if (quantity <= 0) {
+        this.modalSample.aliquots = [];
+        return;
+      }
+      const baseBarcode = this.modalSample.barcode || "";
+      const existing = [...current];
+      const result: AliquotFormItem[] = [];
+      for (let i = 0; i < quantity; i += 1) {
+        if (i < existing.length) {
+          result.push(existing[i]);
+        } else {
+          result.push({
+            barcode: baseBarcode ? `${baseBarcode}-${i + 1}` : "",
+            sampleStatusId: this.getStorageStatusId(),
+            containerId: this.modalSample.containerId,
+            positionInContainer: "",
+          });
+        }
+      }
+      this.modalSample.aliquots = result;
+    },
+    getSampleAliquots(sample: Sample): Aliquot[] {
+      return sample.aliquots || [];
+    },
+    positionsForAliquotContainer(
+      containerId: number | null,
+      currentIndex: number
+    ): Array<{ value: string; disabled: boolean }> {
+      if (!containerId) return [];
+      const container = this.containers.find(
+        (c: ContainerRef) => c.containerId === containerId
+      );
+      if (!container) return [];
+      const layout = resolveContainerLayout(container);
+      if (!layout.total || !layout.columns) return [];
+      const occupied = new Set<string>();
+      this.samples.forEach((s: Sample) => {
+        if (this.modalMode === "edit" && s.sampleId === this.selectedSampleId)
+          return;
+        (s.aliquots || []).forEach((a: Aliquot) => {
+          if (a.containerId === containerId && a.positionInContainer)
+            occupied.add(a.positionInContainer);
+        });
+      });
+      this.modalSample.aliquots.forEach((a, idx) => {
+        if (
+          idx !== currentIndex &&
+          a.containerId === containerId &&
+          a.positionInContainer
+        ) {
+          occupied.add(a.positionInContainer);
+        }
+      });
+      return Array.from({ length: layout.total }, (_, i) => {
+        const index = i + 1;
+        const row = Math.floor((index - 1) / layout.columns) + 1;
+        const column = ((index - 1) % layout.columns) + 1;
+        const value = `${getColumnLabel(column)}${row}`;
+        return {
+          value,
+          disabled: occupied.has(value),
+        };
+      });
     },
     selectSample(sampleId: number) {
       this.selectedSampleId =
@@ -945,9 +981,6 @@ export default defineComponent({
       this.successMessage = "";
       this.modalMode = "create";
       this.modalTitle = "Добавить образец";
-      const storageStatusId = this.getStorageStatusId();
-      this.tubePositions = [];
-      this.tubeStatusIds = storageStatusId != null ? [storageStatusId] : [];
       this.modalSample = {
         visitId: null,
         barcode: "",
@@ -957,12 +990,11 @@ export default defineComponent({
         recommendedStorageMonths: null,
         actualStorageMonths: null,
         expiryStatus: "",
-        sampleStatusId: storageStatusId,
         containerId: null,
-        positionInContainer: "",
         collectionDate: "",
+        aliquots: [],
       };
-      this.syncTubeArrays();
+      this.syncAliquots();
       this.modalOpen = true;
     },
     openEditModal() {
@@ -974,21 +1006,10 @@ export default defineComponent({
       if (!sample) {
         return;
       }
+      this.modalSampleInitializing = true;
       this.modalMode = "edit";
       this.modalTitle = "Обновить образец";
-      const container = this.containers.find(
-        (item) => item.containerId === sample.containerId
-      );
-      const positionLabel =
-        (container &&
-          normalizePositionLabel(container, sample.positionInContainer)) ||
-        sample.positionInContainer ||
-        "";
-      const positionLabels =
-        container && sample.positionInContainer
-          ? extractPositionLabels(container, sample.positionInContainer)
-          : [];
-      const tubeStatusIds = this.parseIdList(sample.tubeStatusIds);
+      const aliquots = sample.aliquots || [];
       this.modalSample = {
         visitId: sample.visitId,
         barcode: sample.barcode,
@@ -998,33 +1019,22 @@ export default defineComponent({
         recommendedStorageMonths: sample.recommendedStorageMonths,
         actualStorageMonths: sample.actualStorageMonths,
         expiryStatus: sample.expiryStatus || "",
-        sampleStatusId: sample.sampleStatusId,
         containerId: sample.containerId,
-        positionInContainer: positionLabel,
         collectionDate: this.toDatetimeLocal(sample.createdAtSample),
+        aliquots:
+          aliquots.length > 0
+            ? aliquots.map((a) => ({
+                barcode: a.barcode,
+                sampleStatusId: a.sampleStatusId,
+                containerId: a.containerId,
+                positionInContainer: a.positionInContainer || "",
+              }))
+            : [],
       };
-      const quantity = Number(sample.initialQuantity || 0);
-      if (quantity > 1) {
-        this.tubePositions = this.normalizeArray(positionLabels, quantity, "");
-        if (tubeStatusIds.length > 0) {
-          this.tubeStatusIds = this.normalizeArray(
-            tubeStatusIds,
-            quantity,
-            tubeStatusIds[0] ?? null
-          );
-        } else if (sample.sampleStatusId != null) {
-          this.tubeStatusIds = Array.from(
-            { length: quantity },
-            () => sample.sampleStatusId
-          );
-        } else {
-          this.tubeStatusIds = Array.from({ length: quantity }, () => null);
-        }
-      } else {
-        this.tubePositions = [];
-        this.tubeStatusIds = [];
-      }
-      this.syncTubeArrays();
+      this.syncAliquots();
+      this.$nextTick(() => {
+        this.modalSampleInitializing = false;
+      });
       this.modalOpen = true;
     },
     closeModal() {
@@ -1034,30 +1044,23 @@ export default defineComponent({
       this.errorMessage = "";
       this.successMessage = "";
       const quantity = Number(this.modalSample.initialQuantity || 0);
-      if (quantity > 0) {
-        if (this.tubeStatusIds.length !== quantity) {
-          this.errorMessage =
-            "Заполните статусы пробирок по количеству пробирок.";
-          return;
-        }
-        if (this.tubeStatusIds.some((id) => id == null)) {
-          this.errorMessage = "Укажите статус для каждой пробирки.";
-          return;
-        }
+      const aliquots = this.modalSample.aliquots || [];
+      if (quantity > 0 && aliquots.length !== quantity) {
+        this.errorMessage =
+          "Количество аликвот должно совпадать с начальным количеством.";
+        return;
       }
-      if (this.modalSample.containerId && quantity > 0) {
-        if (this.tubePositions.length !== quantity) {
-          this.errorMessage =
-            "Количество выбранных позиций должно совпадать с количеством пробирок.";
+      if (quantity > 0) {
+        const emptyBarcodes = aliquots.filter(
+          (a) => !a.barcode || !a.barcode.trim()
+        );
+        if (emptyBarcodes.length > 0) {
+          this.errorMessage = "Укажите штрихкод для каждой аликвоты.";
           return;
         }
-        if (this.tubePositions.some((value) => !value)) {
-          this.errorMessage = "Укажите позицию для каждой пробирки.";
-          return;
-        }
-        const unique = new Set(this.tubePositions);
-        if (unique.size !== this.tubePositions.length) {
-          this.errorMessage = "Позиции пробирок не должны повторяться.";
+        const barcodeSet = new Set(aliquots.map((a) => a.barcode.trim()));
+        if (barcodeSet.size !== aliquots.length) {
+          this.errorMessage = "Штрихкоды аликвот не должны повторяться.";
           return;
         }
       }
@@ -1123,26 +1126,12 @@ export default defineComponent({
       }
     },
     serializeSampleForm() {
-      const quantity = Number(this.modalSample.initialQuantity || 0);
-      const tubePositions =
-        quantity > 0 ? this.tubePositions.filter((value) => value) : [];
-      const tubeStatusIds =
-        quantity > 0 ? this.tubeStatusIds.filter((id) => id != null) : [];
-      const hasUniformStatus =
-        tubeStatusIds.length > 0 &&
-        tubeStatusIds.every((id) => id === tubeStatusIds[0]);
-      const resolvedSampleStatusId =
-        quantity > 0
-          ? hasUniformStatus
-            ? tubeStatusIds[0] ?? null
-            : tubeStatusIds[0] ?? null
-          : this.modalSample.sampleStatusId;
-      const positionValue =
-        this.modalSample.containerId && quantity > 1
-          ? tubePositions.join(", ")
-          : this.modalSample.containerId && quantity === 1
-          ? tubePositions[0] || null
-          : this.modalSample.positionInContainer || null;
+      const aliquots = (this.modalSample.aliquots || []).map((a) => ({
+        barcode: a.barcode.trim(),
+        sampleStatusId: a.sampleStatusId,
+        containerId: a.containerId,
+        positionInContainer: a.positionInContainer || null,
+      }));
       return {
         visitId: this.toNullableNumber(this.modalSample.visitId),
         barcode: this.modalSample.barcode,
@@ -1156,18 +1145,9 @@ export default defineComponent({
         recommendedStorageMonths: this.toNullableNumber(
           this.modalSample.recommendedStorageMonths
         ),
-        actualStorageMonths: this.toNullableNumber(
-          this.modalSample.actualStorageMonths
-        ),
-        expiryStatus: null,
-        sampleStatusId: this.toNullableNumber(resolvedSampleStatusId ?? null),
-        tubeStatusIds:
-          quantity > 0 && tubeStatusIds.length > 0
-            ? tubeStatusIds.join(", ")
-            : null,
         containerId: this.toNullableNumber(this.modalSample.containerId),
-        positionInContainer: positionValue,
         collectionDate: this.modalSample.collectionDate || null,
+        aliquots,
       };
     },
     toNullableNumber(value: number | null) {
@@ -1187,12 +1167,12 @@ export default defineComponent({
       return value.replace(" ", "T").slice(0, 16);
     },
     resetFilters() {
-      this.searchQuery = "";
       this.expiryStatus = "";
-      this.containerFilter = "";
+      this.researchFilter = null;
+      this.mainDiagnosisFilter = null;
       this.sampleTypeFilter = "";
-      this.sampleStatusFilter = "";
-      this.visitFilter = "";
+      this.ageMinFilter = null;
+      this.ageMaxFilter = null;
     },
     getVisitLabel(visitId: number | null | undefined) {
       if (!visitId) return "—";
@@ -1258,6 +1238,57 @@ export default defineComponent({
       );
       return status?.sampleStatusName || "—";
     },
+    getExpiryStatusCode(
+      collectionDate: string | null | undefined,
+      recommendedMonths: number | null | undefined
+    ) {
+      if (!recommendedMonths) {
+        return "GREEN";
+      }
+      const startDate = this.getDateOnly(collectionDate);
+      if (!startDate) {
+        return "GREEN";
+      }
+      const expiryDate = this.addMonthsClamped(startDate, recommendedMonths);
+      const today = this.getTodayDateOnly();
+      if (!today) {
+        return "GREEN";
+      }
+      if (today > expiryDate) {
+        return "RED";
+      }
+      let remainingMonths =
+        (expiryDate.getFullYear() - today.getFullYear()) * 12 +
+        (expiryDate.getMonth() - today.getMonth());
+      if (today.getDate() > expiryDate.getDate()) {
+        remainingMonths -= 1;
+      }
+      return remainingMonths <= 2 ? "YELLOW" : "GREEN";
+    },
+    getExpiryStatusLabel(status: string) {
+      if (status === "RED") return "Просрочен";
+      if (status === "YELLOW") return "Истекает";
+      return "Годен";
+    },
+    getSampleExpiryStatus(sample: Sample) {
+      return this.getExpiryStatusCode(
+        sample.createdAtSample,
+        sample.recommendedStorageMonths
+      );
+    },
+    getDateOnly(value: string | null | undefined) {
+      if (!value) return null;
+      const normalized = value.slice(0, 10);
+      const [year, month, day] = normalized.split("-").map(Number);
+      if (!year || !month || !day) {
+        return null;
+      }
+      return new Date(year, month - 1, day);
+    },
+    getTodayDateOnly() {
+      const now = new Date();
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    },
     getStorageStatusId() {
       const target = this.sampleStatuses.find(
         (status) =>
@@ -1285,10 +1316,7 @@ export default defineComponent({
     },
     formatValue(sample: Sample, key: string) {
       if (key === "expiryStatus") {
-        const value = sample.expiryStatus;
-        if (value === "GREEN") return "Годен";
-        if (value === "YELLOW") return "Истекает";
-        if (value === "RED") return "Просрочен";
+        return this.getExpiryStatusLabel(this.getSampleExpiryStatus(sample));
       }
       if (key === "researchInfo") {
         const visit = this.getVisitById(sample.visitId);
@@ -1323,28 +1351,11 @@ export default defineComponent({
       if (key === "sampleTypeId") {
         return this.getSampleTypeName(sample.sampleTypeId);
       }
-      if (key === "sampleStatusId") {
-        const tubeLabels = this.getTubeStatusLabels(sample);
-        return tubeLabels ?? this.getSampleStatusName(sample.sampleStatusId);
-      }
       if (key === "actualStorageMonths") {
         return this.calculateActualMonths(sample.createdAtSample);
       }
       if (key === "containerId") {
         return this.getContainerLabel(sample.containerId);
-      }
-      if (key === "positionInContainer") {
-        const container = this.containers.find(
-          (item) => item.containerId === sample.containerId
-        );
-        if (container) {
-          const labels = extractPositionLabels(
-            container,
-            sample.positionInContainer
-          );
-          return labels.length > 0 ? labels.join("\n") : value;
-        }
-        return value;
       }
       return value;
     },
@@ -1408,21 +1419,68 @@ h2 {
   font-weight: 600;
 }
 
-.tube-grid {
-  display: grid;
-  gap: 10px;
+.aliquots-details-row {
+  background-color: #e8e0d8;
 }
 
-.tube-row {
+.aliquots-cell {
+  padding: 12px 16px !important;
+  vertical-align: top;
+}
+
+.aliquots-header {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.aliquot-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.aliquot-row:last-child {
+  border-bottom: none;
+}
+
+.aliquot-barcode {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.aliquot-status,
+.aliquot-position,
+.aliquot-container {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.aliquots-empty {
+  color: var(--text-secondary);
+  font-style: italic;
+  padding: 8px 0;
+}
+
+.aliquots-form-grid {
   display: grid;
-  grid-template-columns: 120px 1fr 1fr;
+  gap: 12px;
+}
+
+.aliquot-form-row {
+  display: grid;
+  grid-template-columns: 100px 1fr 140px 140px 120px;
   gap: 8px;
   align-items: center;
 }
 
-.tube-label {
+.aliquot-form-label {
   color: var(--text-secondary);
   font-weight: 600;
+  font-size: 0.9rem;
 }
 
 .form-control {
@@ -1532,6 +1590,62 @@ h2 {
 .samples-table th {
   color: var(--text-primary);
   background-color: #f0e9df;
+}
+
+.header-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.help-button {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: #d8c9b6;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.help-button:hover {
+  background: #cfc1ad;
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.help-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 220px;
+  max-width: 320px;
+  background: #151d23;
+  color: #f2ede6;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  line-height: 1.3;
+  box-shadow: 0 12px 24px rgba(16, 24, 30, 0.25);
+  z-index: 5;
+  white-space: normal;
+}
+
+.help-popover::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 10px;
+  width: 12px;
+  height: 12px;
+  background: #151d23;
+  transform: rotate(45deg);
 }
 
 .alert {

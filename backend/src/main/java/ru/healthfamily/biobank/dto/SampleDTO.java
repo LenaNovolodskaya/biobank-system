@@ -5,7 +5,10 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import ru.healthfamily.biobank.model.Sample.ExpiryStatus;
+
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -20,11 +23,10 @@ public class SampleDTO {
     private Integer recommendedStorageMonths;
     private Integer actualStorageMonths;
     private ExpiryStatus expiryStatus;
-    private Long sampleStatusId;
-    private String tubeStatusIds;
     private Long containerId;
-    private String positionInContainer;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAtSample;
+
+    private List<AliquotDTO> aliquots = new ArrayList<>();
 }

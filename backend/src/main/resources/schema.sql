@@ -151,7 +151,7 @@ CREATE TABLE sample_statuses (
     sample_status_name VARCHAR(50) UNIQUE NOT NULL
 );
 
--- Таблица биообразцов
+-- Таблица биообразцов (общие поля образца)
 CREATE TABLE samples (
     sample_id SERIAL PRIMARY KEY,
     visit_id INT NOT NULL,
@@ -162,10 +162,7 @@ CREATE TABLE samples (
     recommended_storage_months INT,
     actual_storage_months INT,
     expiry_status expiry_status_type DEFAULT 'GREEN',
-    sample_status_id INT,
-    tube_status_ids TEXT,
     container_id INT,
-    position_in_container VARCHAR(20),
     created_at_sample TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
     CONSTRAINT fk_samples_visit 
@@ -177,11 +174,26 @@ CREATE TABLE samples (
         FOREIGN KEY (sample_type_id) 
         REFERENCES sample_types(sample_type_id),
     
-    CONSTRAINT fk_samples_status 
-        FOREIGN KEY (sample_status_id) 
-        REFERENCES sample_statuses(sample_status_id),
-    
     CONSTRAINT chk_quantity CHECK (current_quantity <= initial_quantity)
+);
+
+-- Таблица аликвот (пробирки с уникальным штрихкодом, статусом и позицией)
+CREATE TABLE aliquots (
+    aliquot_id SERIAL PRIMARY KEY,
+    barcode VARCHAR(100) UNIQUE NOT NULL,
+    sample_id INT NOT NULL,
+    sample_status_id INT,
+    container_id INT,
+    position_in_container VARCHAR(50),
+    
+    CONSTRAINT fk_aliquots_sample 
+        FOREIGN KEY (sample_id) 
+        REFERENCES samples(sample_id)
+        ON DELETE CASCADE,
+    
+    CONSTRAINT fk_aliquots_status 
+        FOREIGN KEY (sample_status_id) 
+        REFERENCES sample_statuses(sample_status_id)
 );
 
 -- Типы транзакций (справочник)
@@ -328,9 +340,15 @@ CREATE TABLE storage_containers (
         CHECK (current_samples_count <= max_samples_count)
 );
 
--- Добавляем внешний ключ из samples в storage_containers
+-- Добавляем внешние ключи на контейнеры
 ALTER TABLE samples 
 ADD CONSTRAINT fk_samples_container 
+    FOREIGN KEY (container_id) 
+    REFERENCES storage_containers(container_id)
+    ON DELETE SET NULL;
+
+ALTER TABLE aliquots
+ADD CONSTRAINT fk_aliquots_container 
     FOREIGN KEY (container_id) 
     REFERENCES storage_containers(container_id)
     ON DELETE SET NULL;

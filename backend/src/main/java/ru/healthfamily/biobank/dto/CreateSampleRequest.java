@@ -1,12 +1,15 @@
 package ru.healthfamily.biobank.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
-import ru.healthfamily.biobank.model.Sample.ExpiryStatus;
+
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 public class CreateSampleRequest {
@@ -29,18 +32,20 @@ public class CreateSampleRequest {
 
     private Integer recommendedStorageMonths;
 
-    private Integer actualStorageMonths;
-
-    private ExpiryStatus expiryStatus;
-
-    private Long sampleStatusId;
-
-    private String tubeStatusIds;
-
     private Long containerId;
-
-    private String positionInContainer;
 
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm")
     private LocalDateTime collectionDate;
+
+    @Valid
+    private List<AliquotItem> aliquots = new ArrayList<>();
+
+    @Data
+    public static class AliquotItem {
+        @NotBlank(message = "Штрихкод аликвоты обязателен")
+        private String barcode;
+        private Long sampleStatusId;
+        private Long containerId;
+        private String positionInContainer;
+    }
 }

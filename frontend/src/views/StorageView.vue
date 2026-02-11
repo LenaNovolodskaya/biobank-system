@@ -537,16 +537,22 @@
               </select>
             </div>
             <div class="form-group">
-              <label>Пробирки</label>
+              <label>Аликвоты</label>
               <div v-if="drawerTubeCount > 0" class="tube-grid">
                 <div
-                  v-for="index in drawerTubeCount"
+                  v-for="(aliquot, index) in drawerSampleForm.aliquots"
                   :key="index"
                   class="tube-row"
                 >
-                  <div class="tube-label">Пробирка {{ index }}</div>
+                  <div class="tube-label">Аликвота {{ index + 1 }}</div>
+                  <input
+                    v-model="aliquot.barcode"
+                    type="text"
+                    class="form-control"
+                    placeholder="Штрихкод"
+                  />
                   <select
-                    v-model.number="drawerTubeStatusIds[index - 1]"
+                    v-model.number="aliquot.sampleStatusId"
                     class="form-control"
                   >
                     <option :value="null">Не указано</option>
@@ -559,24 +565,42 @@
                     </option>
                   </select>
                   <select
-                    v-model="drawerTubePositions[index - 1]"
+                    v-model.number="aliquot.containerId"
                     class="form-control"
-                    :disabled="!drawerSampleForm.containerId"
+                  >
+                    <option :value="null">Не указано</option>
+                    <option
+                      v-for="c in containerRefs"
+                      :key="c.containerId"
+                      :value="c.containerId"
+                    >
+                      {{ c.containerType || "Контейнер" }} №{{
+                        c.containerNumber ?? "—"
+                      }}
+                    </option>
+                  </select>
+                  <select
+                    v-model="aliquot.positionInContainer"
+                    class="form-control"
+                    :disabled="!aliquot.containerId"
                   >
                     <option value="">Не указано</option>
                     <option
-                      v-for="position in drawerPositionsForContainer"
-                      :key="position.value"
-                      :value="position.value"
-                      :disabled="isDrawerPositionDisabled(position, index - 1)"
+                      v-for="pos in drawerPositionsForAliquot(
+                        aliquot.containerId,
+                        index
+                      )"
+                      :key="pos.value"
+                      :value="pos.value"
+                      :disabled="pos.disabled"
                     >
-                      {{ position.value }}
+                      {{ pos.value }}
                     </option>
                   </select>
                 </div>
               </div>
               <div v-else class="readonly-field">
-                Укажите количество пробирок.
+                Укажите количество аликвот.
               </div>
             </div>
             <div class="form-actions">
@@ -801,6 +825,15 @@ interface StorageLocation {
   units: StorageUnit[];
 }
 
+interface Aliquot {
+  aliquotId: number;
+  barcode: string;
+  sampleId: number;
+  sampleStatusId: number | null;
+  containerId: number | null;
+  positionInContainer: string | null;
+}
+
 interface Sample {
   sampleId: number;
   visitId: number;
@@ -808,14 +841,12 @@ interface Sample {
   sampleTypeId: number | null;
   initialQuantity: number | null;
   containerId: number | null;
-  positionInContainer: string | null;
   currentQuantity: number;
   recommendedStorageMonths: number | null;
   actualStorageMonths: number | null;
   expiryStatus: string;
-  sampleStatusId: number | null;
-  tubeStatusIds?: string | null;
   createdAtSample: string;
+  aliquots?: Aliquot[];
 }
 
 interface VisitRef {
@@ -930,6 +961,7 @@ export default defineComponent({
       sampleStatuses: [] as SampleStatusRef[],
       sampleDrawerOpen: false,
       sampleDrawerMode: null as "details" | "create" | "edit" | null,
+      drawerFormInitializing: false,
       selectedCell: null as { containerId: number; label: string } | null,
       selectedSample: null as Sample | null,
       drawerSampleForm: {
@@ -941,13 +973,15 @@ export default defineComponent({
         recommendedStorageMonths: null as number | null,
         actualStorageMonths: null as number | null,
         expiryStatus: "",
-        sampleStatusId: null as number | null,
         containerId: null as number | null,
-        positionInContainer: "",
         collectionDate: "",
+        aliquots: [] as Array<{
+          barcode: string;
+          sampleStatusId: number | null;
+          containerId: number | null;
+          positionInContainer: string;
+        }>,
       },
-      drawerTubePositions: [] as string[],
-      drawerTubeStatusIds: [] as Array<number | null>,
     };
   },
   created() {
@@ -981,26 +1015,39 @@ export default defineComponent({
       if (next === prev) {
         return;
       }
+      if (this.drawerFormInitializing) {
+        return;
+      }
       if (
         this.sampleDrawerMode === "create" &&
         this.selectedCell &&
         next === this.selectedCell.containerId
       ) {
-        this.drawerSampleForm.positionInContainer = this.selectedCell.label;
-        this.drawerTubePositions = [this.selectedCell.label];
-        this.syncDrawerTubeArrays();
+        this.drawerSampleForm.aliquots = [
+          {
+            barcode: "",
+            sampleStatusId: this.getStorageStatusId(),
+            containerId: this.selectedCell.containerId,
+            positionInContainer: this.selectedCell.label,
+          },
+        ];
+        this.syncDrawerAliquots();
         return;
       }
-      this.drawerSampleForm.positionInContainer = "";
-      this.drawerTubePositions = [];
-      this.syncDrawerTubeArrays();
+      this.drawerSampleForm.aliquots = [];
+      this.syncDrawerAliquots();
     },
     "drawerSampleForm.initialQuantity"() {
       if (this.sampleDrawerMode === "create") {
         this.drawerSampleForm.currentQuantity =
           this.drawerSampleForm.initialQuantity;
       }
-      this.syncDrawerTubeArrays();
+      this.syncDrawerAliquots();
+    },
+    "drawerSampleForm.barcode"() {
+      if (this.sampleDrawerMode === "create" && this.drawerTubeCount > 0) {
+        this.syncDrawerAliquots();
+      }
     },
   },
   computed: {
@@ -1110,83 +1157,16 @@ export default defineComponent({
       const quantity = Number(this.drawerSampleForm.initialQuantity || 0);
       return Number.isFinite(quantity) && quantity > 0 ? quantity : 0;
     },
-    drawerPositionsForContainer() {
-      const self = this as unknown as {
-        containerRefs: StorageContainer[];
-        drawerSampleForm: {
-          containerId: number | null;
-          positionInContainer: string;
-        };
-        samples: Sample[];
-        drawerTubePositions: string[];
-        sampleDrawerMode: "details" | "create" | "edit" | null;
-        selectedSample: Sample | null;
-        resolveContainerLayout: (container: StorageContainer) => {
-          rows: number;
-          columns: number;
-          total: number;
-        };
-        getColumnLabel: (index: number) => string;
-        getPositionLabels: (
-          container: StorageContainer,
-          value: string | null
-        ) => string[];
-      };
-      const container = self.containerRefs.find(
-        (item) => item.containerId === self.drawerSampleForm.containerId
-      );
-      if (!container) {
-        return [];
-      }
-      const layout = self.resolveContainerLayout(container);
-      if (!layout.total || !layout.columns) {
-        return [];
-      }
-      const occupied = new Set<string>();
-      self.samples
-        .filter((sample) => sample.containerId === container.containerId)
-        .forEach((sample) => {
-          if (
-            self.sampleDrawerMode === "edit" &&
-            sample.sampleId === self.selectedSample?.sampleId
-          ) {
-            return;
-          }
-          self
-            .getPositionLabels(container, sample.positionInContainer)
-            .forEach((label) => occupied.add(label));
-        });
-      return Array.from({ length: layout.total }, (_, i) => {
-        const index = i + 1;
-        const row = Math.floor((index - 1) / layout.columns) + 1;
-        const column = ((index - 1) % layout.columns) + 1;
-        const value = `${self.getColumnLabel(column)}${row}`;
-        return {
-          value,
-          disabled:
-            occupied.has(value) && !self.drawerTubePositions.includes(value),
-        };
-      });
-    },
     drawerActualMonthsPreview(): string {
       return this.calculateActualMonths(this.drawerSampleForm.collectionDate);
     },
     drawerExpiryPreview(): string {
-      if (!this.drawerSampleForm.recommendedStorageMonths) {
-        return "Годен";
-      }
-      const actual = Number(this.drawerActualMonthsPreview);
-      if (Number.isNaN(actual)) {
-        return "Годен";
-      }
-      const remaining = this.drawerSampleForm.recommendedStorageMonths - actual;
-      if (remaining < 0) {
-        return "Просрочен";
-      }
-      if (remaining <= 2) {
-        return "Истекает";
-      }
-      return "Годен";
+      return this.getExpiryStatusLabel(
+        this.getExpiryStatusCode(
+          this.drawerSampleForm.collectionDate,
+          this.drawerSampleForm.recommendedStorageMonths
+        )
+      );
     },
     sampleDetailFields(): Array<{ key: string; label: string }> {
       return [
@@ -1414,13 +1394,15 @@ export default defineComponent({
       const samples = this.getSamplesForContainer(container.containerId);
       const map = new Map<string, Sample>();
       samples.forEach((sample) => {
-        const labels = this.getPositionLabels(
-          container,
-          sample.positionInContainer
-        );
-        labels.forEach((label) => {
-          if (!map.has(label)) {
-            map.set(label, sample);
+        (sample.aliquots || []).forEach((a) => {
+          if (
+            a.containerId === container.containerId &&
+            a.positionInContainer
+          ) {
+            const label = a.positionInContainer.trim();
+            if (label && !map.has(label)) {
+              map.set(label, sample);
+            }
           }
         });
       });
@@ -1464,7 +1446,7 @@ export default defineComponent({
           label,
           filled: filled.has(label),
           sampleBarcode: sample?.barcode,
-          expiryStatus: sample?.expiryStatus,
+          expiryStatus: sample ? this.getSampleExpiryStatus(sample) : undefined,
         };
       });
     },
@@ -1520,6 +1502,57 @@ export default defineComponent({
       );
       return status?.sampleStatusName || "—";
     },
+    getDateOnly(value: string | null | undefined) {
+      if (!value) return null;
+      const normalized = value.slice(0, 10);
+      const [year, month, day] = normalized.split("-").map(Number);
+      if (!year || !month || !day) {
+        return null;
+      }
+      return new Date(year, month - 1, day);
+    },
+    getTodayDateOnly() {
+      const now = new Date();
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    },
+    getExpiryStatusCode(
+      collectionDate: string | null | undefined,
+      recommendedMonths: number | null | undefined
+    ) {
+      if (!recommendedMonths) {
+        return "GREEN";
+      }
+      const startDate = this.getDateOnly(collectionDate);
+      if (!startDate) {
+        return "GREEN";
+      }
+      const expiryDate = this.addMonthsClamped(startDate, recommendedMonths);
+      const today = this.getTodayDateOnly();
+      if (!today) {
+        return "GREEN";
+      }
+      if (today > expiryDate) {
+        return "RED";
+      }
+      let remainingMonths =
+        (expiryDate.getFullYear() - today.getFullYear()) * 12 +
+        (expiryDate.getMonth() - today.getMonth());
+      if (today.getDate() > expiryDate.getDate()) {
+        remainingMonths -= 1;
+      }
+      return remainingMonths <= 2 ? "YELLOW" : "GREEN";
+    },
+    getExpiryStatusLabel(status: string) {
+      if (status === "RED") return "Просрочен";
+      if (status === "YELLOW") return "Истекает";
+      return "Годен";
+    },
+    getSampleExpiryStatus(sample: Sample) {
+      return this.getExpiryStatusCode(
+        sample.createdAtSample,
+        sample.recommendedStorageMonths
+      );
+    },
     getStorageStatusId() {
       const target = this.sampleStatuses.find(
         (status) =>
@@ -1550,18 +1583,44 @@ export default defineComponent({
       return new Date(value).toLocaleDateString("ru-RU");
     },
     calculateActualMonths(value: string | null | undefined): string {
-      if (!value) {
+      const startDate = this.getDateOnly(value);
+      const today = this.getTodayDateOnly();
+      if (!startDate || !today) {
         return "—";
       }
-      const fromDate = new Date(value);
-      if (Number.isNaN(fromDate.getTime())) {
+      if (today < startDate) {
+        return "0 мес 0 дн";
+      }
+      const diff = this.getMonthsDaysDiff(startDate, today);
+      if (!diff) {
         return "—";
       }
-      const now = new Date();
-      const months =
-        (now.getFullYear() - fromDate.getFullYear()) * 12 +
-        (now.getMonth() - fromDate.getMonth());
-      return months >= 0 ? String(months) : "—";
+      return `${diff.months} мес ${diff.days} дн`;
+    },
+    getMonthsDaysDiff(startDate: Date, endDate: Date) {
+      if (endDate < startDate) {
+        return null;
+      }
+      let months =
+        (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+        (endDate.getMonth() - startDate.getMonth());
+      if (endDate.getDate() < startDate.getDate()) {
+        months -= 1;
+      }
+      const anchor = this.addMonthsClamped(startDate, months);
+      const days = Math.round(
+        (endDate.getTime() - anchor.getTime()) / (24 * 60 * 60 * 1000)
+      );
+      return { months, days: Math.max(days, 0) };
+    },
+    addMonthsClamped(date: Date, monthsToAdd: number) {
+      const year = date.getFullYear();
+      const month = date.getMonth() + monthsToAdd;
+      const day = date.getDate();
+      const targetYear = year + Math.floor(month / 12);
+      const targetMonth = ((month % 12) + 12) % 12;
+      const lastDay = new Date(targetYear, targetMonth + 1, 0).getDate();
+      return new Date(targetYear, targetMonth, Math.min(day, lastDay));
     },
     parseIdList(value?: string | null): number[] {
       if (!value) return [];
@@ -1570,22 +1629,9 @@ export default defineComponent({
         .map((item) => Number(item.trim()))
         .filter((item) => Number.isFinite(item));
     },
-    getTubeStatusLabels(sample: Sample) {
-      const tubeStatusIds = this.parseIdList(sample.tubeStatusIds);
-      if (tubeStatusIds.length === 0) {
-        return null;
-      }
-      const labels = tubeStatusIds.map((id) =>
-        this.getSampleStatusName(id ?? null)
-      );
-      return labels.filter((label) => label && label !== "—").join("\n");
-    },
     formatSampleValue(sample: Sample, key: string) {
       if (key === "expiryStatus") {
-        const value = sample.expiryStatus;
-        if (value === "GREEN") return "Годен";
-        if (value === "YELLOW") return "Истекает";
-        if (value === "RED") return "Просрочен";
+        return this.getExpiryStatusLabel(this.getSampleExpiryStatus(sample));
       }
       if (key === "researchInfo") {
         const visit = this.getVisitById(sample.visitId);
@@ -1621,8 +1667,11 @@ export default defineComponent({
         return this.getSampleTypeName(sample.sampleTypeId);
       }
       if (key === "sampleStatusId") {
-        const tubeLabels = this.getTubeStatusLabels(sample);
-        return tubeLabels ?? this.getSampleStatusName(sample.sampleStatusId);
+        const aliquots = sample.aliquots || [];
+        const labels = aliquots
+          .map((a) => this.getSampleStatusName(a.sampleStatusId))
+          .filter((l) => l && l !== "—");
+        return labels.length > 0 ? labels.join("\n") : "—";
       }
       if (key === "actualStorageMonths") {
         return this.calculateActualMonths(sample.createdAtSample);
@@ -1631,17 +1680,11 @@ export default defineComponent({
         return this.getContainerLabel(sample.containerId);
       }
       if (key === "positionInContainer") {
-        const container = this.containerRefs.find(
-          (item) => item.containerId === sample.containerId
-        );
-        if (container) {
-          const labels = this.getPositionLabels(
-            container,
-            sample.positionInContainer
-          );
-          return labels.length > 0 ? labels.join("\n") : value;
-        }
-        return value;
+        const aliquots = sample.aliquots || [];
+        const labels = aliquots
+          .map((a) => a.positionInContainer)
+          .filter((p): p is string => !!p && p.trim() !== "");
+        return labels.length > 0 ? labels.join("\n") : "—";
       }
       return value;
     },
@@ -1666,45 +1709,70 @@ export default defineComponent({
         visit.collectionDate
       );
     },
-    syncDrawerTubeArrays() {
+    syncDrawerAliquots() {
       const quantity = this.drawerTubeCount;
       if (quantity <= 0) {
-        this.drawerTubePositions = [];
-        this.drawerTubeStatusIds = [];
+        this.drawerSampleForm.aliquots = [];
         return;
       }
-      const positionFallback =
-        this.sampleDrawerMode === "create" && this.selectedCell
-          ? ""
-          : this.drawerSampleForm.positionInContainer || "";
-      this.drawerTubePositions = this.normalizeArray(
-        this.drawerTubePositions,
-        quantity,
-        positionFallback
-      );
-      this.drawerTubeStatusIds = this.normalizeArray(
-        this.drawerTubeStatusIds,
-        quantity,
-        this.drawerSampleForm.sampleStatusId ?? null
-      );
-    },
-    normalizeArray<T>(values: T[], length: number, fallback: T): T[] {
-      const result = values.slice(0, length);
-      while (result.length < length) {
-        result.push(fallback);
+      const baseBarcode = this.drawerSampleForm.barcode || "";
+      const current = [...(this.drawerSampleForm.aliquots || [])];
+      const result = [];
+      for (let i = 0; i < quantity; i += 1) {
+        if (i < current.length) {
+          result.push(current[i]);
+        } else {
+          result.push({
+            barcode: baseBarcode ? `${baseBarcode}-${i + 1}` : "",
+            sampleStatusId: this.getStorageStatusId(),
+            containerId:
+              this.selectedCell?.containerId ??
+              this.drawerSampleForm.containerId,
+            positionInContainer: this.selectedCell?.label ?? "",
+          });
+        }
       }
-      return result;
+      this.drawerSampleForm.aliquots = result;
     },
-    isDrawerPositionDisabled(
-      position: { value: string; disabled: boolean },
-      index: number
-    ) {
-      if (position.disabled) {
-        return true;
-      }
-      return this.drawerTubePositions.some(
-        (value, idx) => idx !== index && value === position.value
+    drawerPositionsForAliquot(
+      containerId: number | null,
+      currentIndex: number
+    ): Array<{ value: string; disabled: boolean }> {
+      if (!containerId) return [];
+      const container = this.containerRefs.find(
+        (c) => c.containerId === containerId
       );
+      if (!container) return [];
+      const layout = this.resolveContainerLayout(container);
+      if (!layout.total || !layout.columns) return [];
+      const occupied = new Set<string>();
+      this.samples.forEach((s) => {
+        if (
+          this.sampleDrawerMode === "edit" &&
+          s.sampleId === this.selectedSample?.sampleId
+        )
+          return;
+        (s.aliquots || []).forEach((a) => {
+          if (a.containerId === containerId && a.positionInContainer)
+            occupied.add(a.positionInContainer);
+        });
+      });
+      (this.drawerSampleForm.aliquots || []).forEach((a, idx) => {
+        if (
+          idx !== currentIndex &&
+          a.containerId === containerId &&
+          a.positionInContainer
+        ) {
+          occupied.add(a.positionInContainer);
+        }
+      });
+      return Array.from({ length: layout.total }, (_, i) => {
+        const index = i + 1;
+        const row = Math.floor((index - 1) / layout.columns) + 1;
+        const column = ((index - 1) % layout.columns) + 1;
+        const value = `${this.getColumnLabel(column)}${row}`;
+        return { value, disabled: occupied.has(value) };
+      });
     },
     onCellClick(
       container: StorageContainer,
@@ -1724,13 +1792,13 @@ export default defineComponent({
     ): Sample | null {
       const samples = this.getSamplesForContainer(container.containerId);
       return (
-        samples.find((sample) => {
-          const labels = this.getPositionLabels(
-            container,
-            sample.positionInContainer
-          );
-          return labels.includes(label);
-        }) || null
+        samples.find((sample) =>
+          (sample.aliquots || []).some(
+            (a) =>
+              a.containerId === container.containerId &&
+              a.positionInContainer?.trim() === label
+          )
+        ) || null
       );
     },
     openSampleDetails(
@@ -1761,40 +1829,26 @@ export default defineComponent({
         recommendedStorageMonths: null,
         actualStorageMonths: null,
         expiryStatus: "",
-        sampleStatusId: storageStatusId,
-        containerId,
-        positionInContainer: label,
+        containerId: containerId,
         collectionDate: "",
+        aliquots: [
+          {
+            barcode: "",
+            sampleStatusId: storageStatusId,
+            containerId: containerId,
+            positionInContainer: label,
+          },
+        ],
       };
-      this.drawerTubePositions = [label];
-      this.drawerTubeStatusIds =
-        storageStatusId != null ? [storageStatusId] : [null];
-      this.syncDrawerTubeArrays();
+      this.syncDrawerAliquots();
     },
     openSampleEdit() {
       if (!this.selectedSample) {
         return;
       }
+      this.drawerFormInitializing = true;
       this.sampleDrawerMode = "edit";
-      const container = this.containerRefs.find(
-        (item) => item.containerId === this.selectedSample?.containerId
-      );
-      const positionLabel =
-        (container &&
-          this.normalizePositionLabel(
-            container,
-            this.selectedSample.positionInContainer
-          )) ||
-        this.selectedSample.positionInContainer ||
-        "";
-      const positionLabels =
-        container && this.selectedSample.positionInContainer
-          ? this.getPositionLabels(
-              container,
-              this.selectedSample.positionInContainer
-            )
-          : [];
-      const tubeStatusIds = this.parseIdList(this.selectedSample.tubeStatusIds);
+      const aliquots = this.selectedSample.aliquots || [];
       this.drawerSampleForm = {
         visitId: this.selectedSample.visitId,
         barcode: this.selectedSample.barcode,
@@ -1804,44 +1858,24 @@ export default defineComponent({
         recommendedStorageMonths: this.selectedSample.recommendedStorageMonths,
         actualStorageMonths: this.selectedSample.actualStorageMonths,
         expiryStatus: this.selectedSample.expiryStatus || "",
-        sampleStatusId: this.selectedSample.sampleStatusId,
         containerId: this.selectedSample.containerId,
-        positionInContainer: positionLabel,
         collectionDate: this.toDatetimeLocal(
           this.selectedSample.createdAtSample
         ),
+        aliquots:
+          aliquots.length > 0
+            ? aliquots.map((a) => ({
+                barcode: a.barcode,
+                sampleStatusId: a.sampleStatusId,
+                containerId: a.containerId,
+                positionInContainer: a.positionInContainer || "",
+              }))
+            : [],
       };
-      const quantity = Number(this.selectedSample.initialQuantity || 0);
-      if (quantity > 1) {
-        this.drawerTubePositions = this.normalizeArray(
-          positionLabels,
-          quantity,
-          ""
-        );
-        if (tubeStatusIds.length > 0) {
-          this.drawerTubeStatusIds = this.normalizeArray(
-            tubeStatusIds,
-            quantity,
-            tubeStatusIds[0] ?? null
-          );
-        } else if (this.selectedSample.sampleStatusId != null) {
-          this.drawerTubeStatusIds = Array.from(
-            { length: quantity },
-            () => this.selectedSample?.sampleStatusId ?? null
-          );
-        } else {
-          this.drawerTubeStatusIds = Array.from(
-            { length: quantity },
-            () => null
-          );
-        }
-      } else {
-        this.drawerTubePositions = positionLabel ? [positionLabel] : [""];
-        this.drawerTubeStatusIds =
-          this.selectedSample.sampleStatusId != null
-            ? [this.selectedSample.sampleStatusId]
-            : [null];
-      }
+      this.syncDrawerAliquots();
+      this.$nextTick(() => {
+        this.drawerFormInitializing = false;
+      });
     },
     closeSampleDrawer() {
       this.sampleDrawerOpen = false;
@@ -1872,26 +1906,23 @@ export default defineComponent({
         this.errorMessage = "Заполните обязательные поля.";
         return;
       }
-      if (quantity > 0) {
-        if (this.drawerTubeStatusIds.length !== quantity) {
-          this.errorMessage =
-            "Заполните статусы пробирок по количеству пробирок.";
-          return;
-        }
-        if (this.drawerTubeStatusIds.some((id) => id == null)) {
-          this.errorMessage = "Укажите статус для каждой пробирки.";
-          return;
-        }
+      const aliquots = this.drawerSampleForm.aliquots || [];
+      if (quantity > 0 && aliquots.length !== quantity) {
+        this.errorMessage =
+          "Количество аликвот должно совпадать с начальным количеством.";
+        return;
       }
-      if (this.drawerSampleForm.containerId && quantity > 0) {
-        const filledPositions = this.drawerTubePositions.filter(Boolean);
-        if (filledPositions.length === 0) {
-          this.errorMessage = "Укажите хотя бы одну позицию.";
+      if (quantity > 0) {
+        const emptyBarcodes = aliquots.filter(
+          (a) => !a.barcode || !a.barcode.trim()
+        );
+        if (emptyBarcodes.length > 0) {
+          this.errorMessage = "Укажите штрихкод для каждой аликвоты.";
           return;
         }
-        const unique = new Set(filledPositions);
-        if (unique.size !== filledPositions.length) {
-          this.errorMessage = "Позиции пробирок не должны повторяться.";
+        const barcodeSet = new Set(aliquots.map((a) => a.barcode.trim()));
+        if (barcodeSet.size !== aliquots.length) {
+          this.errorMessage = "Штрихкоды аликвот не должны повторяться.";
           return;
         }
       }
@@ -1902,17 +1933,15 @@ export default defineComponent({
       const refreshed =
         this.samples.find((sample) => sample.sampleId === created.sampleId) ||
         created;
+      const firstAliquot = this.drawerSampleForm.aliquots?.[0];
+      const containerId =
+        firstAliquot?.containerId ??
+        this.drawerSampleForm.containerId ??
+        this.selectedCell?.containerId ??
+        0;
       const label =
-        this.drawerSampleForm.positionInContainer ||
-        this.selectedCell?.label ||
-        "";
-      this.openSampleDetails(
-        this.drawerSampleForm.containerId ||
-          this.selectedCell?.containerId ||
-          0,
-        label,
-        refreshed
-      );
+        firstAliquot?.positionInContainer || this.selectedCell?.label || "";
+      this.openSampleDetails(containerId, label, refreshed);
     },
     async updateSampleInDrawer() {
       if (!this.selectedSample) {
@@ -1923,26 +1952,23 @@ export default defineComponent({
         this.errorMessage = "Заполните обязательные поля.";
         return;
       }
-      if (quantity > 0) {
-        if (this.drawerTubeStatusIds.length !== quantity) {
-          this.errorMessage =
-            "Заполните статусы пробирок по количеству пробирок.";
-          return;
-        }
-        if (this.drawerTubeStatusIds.some((id) => id == null)) {
-          this.errorMessage = "Укажите статус для каждой пробирки.";
-          return;
-        }
+      const aliquots = this.drawerSampleForm.aliquots || [];
+      if (quantity > 0 && aliquots.length !== quantity) {
+        this.errorMessage =
+          "Количество аликвот должно совпадать с начальным количеством.";
+        return;
       }
-      if (this.drawerSampleForm.containerId && quantity > 0) {
-        const filledPositions = this.drawerTubePositions.filter(Boolean);
-        if (filledPositions.length === 0) {
-          this.errorMessage = "Укажите хотя бы одну позицию.";
+      if (quantity > 0) {
+        const emptyBarcodes = aliquots.filter(
+          (a) => !a.barcode || !a.barcode.trim()
+        );
+        if (emptyBarcodes.length > 0) {
+          this.errorMessage = "Укажите штрихкод для каждой аликвоты.";
           return;
         }
-        const unique = new Set(filledPositions);
-        if (unique.size !== filledPositions.length) {
-          this.errorMessage = "Позиции пробирок не должны повторяться.";
+        const barcodeSet = new Set(aliquots.map((a) => a.barcode.trim()));
+        if (barcodeSet.size !== aliquots.length) {
+          this.errorMessage = "Штрихкоды аликвот не должны повторяться.";
           return;
         }
       }
@@ -1956,35 +1982,26 @@ export default defineComponent({
         this.samples.find(
           (sample) => sample.sampleId === this.selectedSample?.sampleId
         ) || null;
-      if (refreshed && this.drawerSampleForm.positionInContainer) {
+      const firstAliquot = this.drawerSampleForm.aliquots?.[0];
+      if (
+        refreshed &&
+        firstAliquot?.containerId &&
+        firstAliquot?.positionInContainer
+      ) {
         this.openSampleDetails(
-          refreshed.containerId || this.selectedCell?.containerId || 0,
-          this.drawerSampleForm.positionInContainer,
+          firstAliquot.containerId,
+          firstAliquot.positionInContainer,
           refreshed
         );
       }
     },
     serializeSampleForm() {
-      const quantity = Number(this.drawerSampleForm.initialQuantity || 0);
-      const tubePositions =
-        quantity > 0 ? this.drawerTubePositions.filter((value) => value) : [];
-      const tubeStatusIds =
-        quantity > 0 ? this.drawerTubeStatusIds.filter((id) => id != null) : [];
-      const hasUniformStatus =
-        tubeStatusIds.length > 0 &&
-        tubeStatusIds.every((id) => id === tubeStatusIds[0]);
-      const resolvedSampleStatusId =
-        quantity > 0
-          ? hasUniformStatus
-            ? tubeStatusIds[0] ?? null
-            : tubeStatusIds[0] ?? null
-          : this.drawerSampleForm.sampleStatusId;
-      const positionValue =
-        this.drawerSampleForm.containerId && quantity > 1
-          ? tubePositions.join(", ")
-          : this.drawerSampleForm.containerId && quantity === 1
-          ? tubePositions[0] || null
-          : this.drawerSampleForm.positionInContainer || null;
+      const aliquots = (this.drawerSampleForm.aliquots || []).map((a) => ({
+        barcode: a.barcode.trim(),
+        sampleStatusId: a.sampleStatusId,
+        containerId: a.containerId,
+        positionInContainer: a.positionInContainer || null,
+      }));
       return {
         visitId: this.toNullableNumber(this.drawerSampleForm.visitId),
         barcode: this.drawerSampleForm.barcode,
@@ -1998,18 +2015,9 @@ export default defineComponent({
         recommendedStorageMonths: this.toNullableNumber(
           this.drawerSampleForm.recommendedStorageMonths
         ),
-        actualStorageMonths: this.toNullableNumber(
-          this.drawerSampleForm.actualStorageMonths
-        ),
-        expiryStatus: null,
-        sampleStatusId: this.toNullableNumber(resolvedSampleStatusId ?? null),
-        tubeStatusIds:
-          quantity > 0 && tubeStatusIds.length > 0
-            ? tubeStatusIds.join(", ")
-            : null,
         containerId: this.toNullableNumber(this.drawerSampleForm.containerId),
-        positionInContainer: positionValue,
         collectionDate: this.drawerSampleForm.collectionDate || null,
+        aliquots,
       };
     },
     async deleteSampleInDrawer() {
@@ -2040,9 +2048,12 @@ export default defineComponent({
       }
     },
     getSamplesForContainer(containerId: number): Sample[] {
-      return this.samples.filter(
-        (sample) => sample.containerId === containerId
-      );
+      return this.samples.filter((sample) => {
+        if (sample.containerId === containerId) return true;
+        return (sample.aliquots || []).some(
+          (a) => a.containerId === containerId
+        );
+      });
     },
     getContainersForShelf(shelfIndex: number) {
       if (!this.selectedUnit) {
@@ -2972,7 +2983,7 @@ h2 {
 
 .tube-row {
   display: grid;
-  grid-template-columns: 120px 1fr 1fr;
+  grid-template-columns: 100px 1fr 140px 140px 120px;
   gap: 8px;
   align-items: center;
 }

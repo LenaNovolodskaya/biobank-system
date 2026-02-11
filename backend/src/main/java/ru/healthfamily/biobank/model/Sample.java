@@ -6,7 +6,10 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "samples")
@@ -46,20 +49,14 @@ public class Sample {
     @Column(name = "expiry_status", columnDefinition = "expiry_status_type")
     private ExpiryStatus expiryStatus = ExpiryStatus.GREEN;
 
-    @Column(name = "sample_status_id")
-    private Long sampleStatusId;
-
-    @Column(name = "tube_status_ids")
-    private String tubeStatusIds;
-
     @Column(name = "container_id")
     private Long containerId;
 
-    @Column(name = "position_in_container")
-    private String positionInContainer;
-
     @Column(name = "created_at_sample")
     private LocalDateTime createdAtSample;
+
+    @OneToMany(mappedBy = "sample", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<Aliquot> aliquots = new ArrayList<>();
 
     public enum ExpiryStatus {
         GREEN, YELLOW, RED
