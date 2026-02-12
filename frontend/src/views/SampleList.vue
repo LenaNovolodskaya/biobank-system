@@ -23,95 +23,224 @@
     </div>
 
     <div class="card filters-card">
-      <div class="filters">
-        <div class="form-group">
-          <label for="expiry">Срок годности</label>
-          <select id="expiry" v-model="expiryStatus" class="form-control">
-            <option value="">Все</option>
-            <option value="GREEN">Годен</option>
-            <option value="YELLOW">Истекает</option>
-            <option value="RED">Просрочен</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="researchFilter">Исследование</label>
-          <select
-            id="researchFilter"
-            v-model="researchFilter"
-            class="form-control"
-          >
-            <option :value="null">Все</option>
-            <option
-              v-for="r in researches"
-              :key="r.researchId"
-              :value="r.researchId"
+      <div class="filters-header">
+        <h3>Фильтры</h3>
+        <p class="filters-hint">
+          Выберите поле, укажите значение и нажмите «Добавить» для включения
+          дополнительного фильтра
+        </p>
+      </div>
+      <div class="filters-list">
+        <div v-for="(row, index) in filterRows" :key="index" class="filter-row">
+          <div class="form-group filter-field-group">
+            <label>Поле</label>
+            <select v-model="row.fieldKey" class="form-control">
+              <option value="">— Выберите поле —</option>
+              <option
+                v-for="opt in availableFilterFieldsForRow(index)"
+                :key="opt.key"
+                :value="opt.key"
+              >
+                {{ opt.label }}
+              </option>
+            </select>
+          </div>
+          <div class="form-group filter-value-group">
+            <label>Значение</label>
+            <template v-if="row.fieldKey === 'barcode'">
+              <input
+                v-model="row.value"
+                type="text"
+                class="form-control"
+                placeholder="Часть штрихкода"
+              />
+            </template>
+            <template v-else-if="row.fieldKey === 'expiryStatus'">
+              <select v-model="row.value" class="form-control">
+                <option value="">Все</option>
+                <option value="GREEN">Годен</option>
+                <option value="YELLOW">Истекает</option>
+                <option value="RED">Просрочен</option>
+              </select>
+            </template>
+            <template v-else-if="row.fieldKey === 'researchId'">
+              <select v-model="row.value" class="form-control">
+                <option :value="null">Все</option>
+                <option
+                  v-for="r in researches"
+                  :key="r.researchId"
+                  :value="r.researchId"
+                >
+                  {{ getResearchLabel(r.researchId) }}
+                </option>
+              </select>
+            </template>
+            <template v-else-if="row.fieldKey === 'mainDiagnosisId'">
+              <select v-model="row.value" class="form-control">
+                <option :value="null">Все</option>
+                <option
+                  v-for="d in diagnoses"
+                  :key="d.diagnosisId"
+                  :value="d.diagnosisId"
+                >
+                  {{ getDiagnosisDisplay(d.diagnosisId) }}
+                </option>
+              </select>
+            </template>
+            <template v-else-if="row.fieldKey === 'sampleTypeId'">
+              <select v-model="row.value" class="form-control">
+                <option :value="null">Все</option>
+                <option
+                  v-for="type in sampleTypes"
+                  :key="type.sampleTypeId"
+                  :value="type.sampleTypeId"
+                >
+                  {{ type.sampleTypeName }}
+                </option>
+              </select>
+            </template>
+            <template v-else-if="row.fieldKey === 'containerId'">
+              <select v-model="row.value" class="form-control">
+                <option :value="null">Все</option>
+                <option
+                  v-for="c in containers"
+                  :key="c.containerId"
+                  :value="c.containerId"
+                >
+                  {{ getContainerLabel(c.containerId) }}
+                </option>
+              </select>
+            </template>
+            <template v-else-if="row.fieldKey === 'initialQuantity'">
+              <input
+                v-model.number="row.value"
+                type="number"
+                min="0"
+                class="form-control"
+                placeholder="Кол-во"
+              />
+            </template>
+            <template v-else-if="row.fieldKey === 'currentQuantity'">
+              <input
+                v-model.number="row.value"
+                type="number"
+                min="0"
+                class="form-control"
+                placeholder="Кол-во"
+              />
+            </template>
+            <template v-else-if="row.fieldKey === 'recommendedStorageMonths'">
+              <input
+                v-model.number="row.value"
+                type="number"
+                min="0"
+                class="form-control"
+                placeholder="Месяцев"
+              />
+            </template>
+            <template v-else-if="row.fieldKey === 'ageMin'">
+              <input
+                v-model.number="row.value"
+                type="number"
+                min="0"
+                class="form-control"
+                placeholder="Возраст от"
+              />
+            </template>
+            <template v-else-if="row.fieldKey === 'ageMax'">
+              <input
+                v-model.number="row.value"
+                type="number"
+                min="0"
+                class="form-control"
+                placeholder="Возраст до"
+              />
+            </template>
+            <template v-else-if="row.fieldKey === 'patientGender'">
+              <select v-model="row.value" class="form-control">
+                <option value="">Все</option>
+                <option value="MALE">Мужской</option>
+                <option value="FEMALE">Женский</option>
+              </select>
+            </template>
+            <template v-else-if="row.fieldKey === 'patientNationalityId'">
+              <select v-model="row.value" class="form-control">
+                <option :value="null">Все</option>
+                <option
+                  v-for="n in nationalities"
+                  :key="n.nationalityId"
+                  :value="n.nationalityId"
+                >
+                  {{ n.nationalityName }}
+                </option>
+              </select>
+            </template>
+            <template v-else-if="row.fieldKey === 'comorbidDiagnosisId'">
+              <select v-model="row.value" class="form-control">
+                <option :value="null">Все</option>
+                <option
+                  v-for="d in diagnoses"
+                  :key="d.diagnosisId"
+                  :value="d.diagnosisId"
+                >
+                  {{ getDiagnosisDisplay(d.diagnosisId) }}
+                </option>
+              </select>
+            </template>
+            <template v-else-if="row.fieldKey === 'createdAtSampleFrom'">
+              <input
+                v-model="row.value"
+                type="date"
+                class="form-control"
+                placeholder="Дата от"
+              />
+            </template>
+            <template v-else-if="row.fieldKey === 'actualStorageMonthsMin'">
+              <input
+                v-model.number="row.value"
+                type="number"
+                min="0"
+                class="form-control"
+                placeholder="Месяцев"
+              />
+            </template>
+            <template v-else-if="row.fieldKey === 'patientBirthDateFrom'">
+              <input
+                v-model="row.value"
+                type="date"
+                class="form-control"
+                placeholder="Дата от"
+              />
+            </template>
+            <template v-else>
+              <span class="filter-placeholder">—</span>
+            </template>
+          </div>
+          <div class="filter-row-actions">
+            <button
+              class="icon-button"
+              type="button"
+              aria-label="Удалить фильтр"
+              title="Удалить фильтр"
+              @click="removeFilterRow(index)"
             >
-              {{ getResearchLabel(r.researchId) }}
-            </option>
-          </select>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2H8l1-2z"
+                  fill="currentColor"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
-        <div class="form-group">
-          <label for="mainDiagnosisFilter">Основной диагноз</label>
-          <select
-            id="mainDiagnosisFilter"
-            v-model="mainDiagnosisFilter"
-            class="form-control"
-          >
-            <option :value="null">Все</option>
-            <option
-              v-for="d in diagnoses"
-              :key="d.diagnosisId"
-              :value="d.diagnosisId"
-            >
-              {{ getDiagnosisDisplay(d.diagnosisId) }}
-            </option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="sampleType">Тип образца</label>
-          <select
-            id="sampleType"
-            v-model="sampleTypeFilter"
-            class="form-control"
-          >
-            <option value="">Все</option>
-            <option
-              v-for="type in sampleTypes"
-              :key="type.sampleTypeId"
-              :value="type.sampleTypeName"
-            >
-              {{ type.sampleTypeName }}
-            </option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="ageMin">Возраст от</label>
-          <input
-            id="ageMin"
-            v-model.number="ageMinFilter"
-            type="number"
-            min="0"
-            class="form-control"
-            placeholder="—"
-          />
-        </div>
-        <div class="form-group">
-          <label for="ageMax">Возраст до</label>
-          <input
-            id="ageMax"
-            v-model.number="ageMaxFilter"
-            type="number"
-            min="0"
-            class="form-control"
-            placeholder="—"
-          />
-        </div>
-        <div class="form-actions">
-          <button class="btn btn-secondary" @click="resetFilters">Сброс</button>
-          <button class="btn btn-secondary wide-button" @click="fetchSamples">
-            Обновить список
-          </button>
-        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-secondary" type="button" @click="addFilterRow">
+          Добавить
+        </button>
+        <button class="btn btn-secondary" type="button" @click="resetFilters">
+          Сброс
+        </button>
       </div>
     </div>
 
@@ -120,9 +249,13 @@
         <h3>Столбцы</h3>
       </div>
       <div class="columns-grid">
-        <label v-for="column in columns" :key="column.key" class="checkbox">
+        <label
+          v-for="column in columnsForSelection"
+          :key="column.key"
+          class="checkbox"
+        >
           <input type="checkbox" v-model="column.visible" />
-          <span>{{ column.label }}</span>
+          <span>{{ column.labelFull }}</span>
         </label>
       </div>
     </div>
@@ -490,6 +623,7 @@ interface Sample {
 interface ColumnConfig {
   key: string;
   label: string;
+  labelFull: string;
   visible: boolean;
 }
 
@@ -522,6 +656,7 @@ interface VisitRef {
   collectionDate: string;
   ageAtCollection: number;
   diagnosisId: number | null;
+  comorbidDiagnosisIds?: number[];
 }
 
 interface PatientRef {
@@ -529,8 +664,14 @@ interface PatientRef {
   patientBarcode: string;
   gender: string;
   birthDate: string;
+  nationalityId?: number | null;
   nationalityName?: string;
   mainDiagnosisId?: number | null;
+}
+
+interface NationalityRef {
+  nationalityId: number;
+  nationalityName: string;
 }
 
 interface ResearchRef {
@@ -641,41 +782,133 @@ export default defineComponent({
       sampleTypes: [] as SampleTypeRef[],
       sampleStatuses: [] as SampleStatusRef[],
       containers: [] as ContainerRef[],
-      expiryStatus: "",
-      researchFilter: null as number | null,
-      mainDiagnosisFilter: null as number | null,
-      sampleTypeFilter: "",
-      ageMinFilter: null as number | null | string,
-      ageMaxFilter: null as number | null | string,
+      nationalities: [] as NationalityRef[],
+      filterRows: [
+        { fieldKey: "", value: null as string | number | null },
+      ] as Array<{ fieldKey: string; value: string | number | null }>,
+      filterFieldDefinitions: [
+        { key: "barcode", label: "Штрихкод" },
+        { key: "sampleTypeId", label: "Тип" },
+        { key: "containerId", label: "Контейнер" },
+        { key: "initialQuantity", label: "Начальное количество" },
+        { key: "currentQuantity", label: "Текущее количество" },
+        { key: "createdAtSampleFrom", label: "Дата забора от" },
+        {
+          key: "actualStorageMonthsMin",
+          label: "Фактический срок хранения от",
+        },
+        {
+          key: "recommendedStorageMonths",
+          label: "Рекомендованный срок хранения",
+        },
+        { key: "expiryStatus", label: "Статус срока хранения" },
+        { key: "ageMin", label: "Возраст от" },
+        { key: "ageMax", label: "Возраст до" },
+        { key: "mainDiagnosisId", label: "Основной диагноз" },
+        { key: "comorbidDiagnosisId", label: "Сопутствующие диагнозы" },
+        { key: "patientGender", label: "Пол" },
+        { key: "patientBirthDateFrom", label: "Дата рождения от" },
+        { key: "patientNationalityId", label: "Национальность" },
+        { key: "researchId", label: "Исследование" },
+      ] as Array<{ key: string; label: string }>,
       columns: [
-        { key: "sampleTypeIcon", label: "", visible: true },
-        { key: "barcode", label: "Штрихкод", visible: true },
-        { key: "sampleTypeId", label: "Тип", visible: true },
-        { key: "containerId", label: "Контейнер", visible: true },
-        { key: "initialQuantity", label: "Начальное кол-во", visible: true },
-        { key: "currentQuantity", label: "Текущее кол-во", visible: true },
+        { key: "sampleTypeIcon", label: "", labelFull: "", visible: true },
+        {
+          key: "barcode",
+          label: "Штрихкод",
+          labelFull: "Штрихкод",
+          visible: true,
+        },
+        {
+          key: "sampleTypeId",
+          label: "Тип",
+          labelFull: "Тип образца",
+          visible: true,
+        },
+        {
+          key: "containerId",
+          label: "Контейнер",
+          labelFull: "Контейнер",
+          visible: true,
+        },
+        {
+          key: "initialQuantity",
+          label: "Нач. кол-во",
+          labelFull: "Начальное количество",
+          visible: true,
+        },
+        {
+          key: "currentQuantity",
+          label: "Тек. кол-во",
+          labelFull: "Текущее количество",
+          visible: true,
+        },
         {
           key: "createdAtSample",
           label: "Дата забора",
+          labelFull: "Дата забора",
           visible: true,
         },
         {
           key: "actualStorageMonths",
           label: "Факт. хранение",
+          labelFull: "Фактический срок хранения",
           visible: true,
         },
         {
           key: "recommendedStorageMonths",
           label: "Рек. хранение",
+          labelFull: "Рекомендованный срок хранения",
           visible: true,
         },
-        { key: "expiryStatus", label: "Срок хранения", visible: true },
-        { key: "patientAge", label: "Возраст", visible: true },
-        { key: "mainDiagnosis", label: "Основной диагноз", visible: true },
-        { key: "patientGender", label: "Пол", visible: true },
-        { key: "patientBirthDate", label: "Дата рождения", visible: true },
-        { key: "patientNationality", label: "Национальность", visible: true },
-        { key: "researchInfo", label: "Исследование", visible: true },
+        {
+          key: "expiryStatus",
+          label: "Срок хранения",
+          labelFull: "Статус срока хранения",
+          visible: true,
+        },
+        {
+          key: "patientAge",
+          label: "Возраст",
+          labelFull: "Возраст",
+          visible: false,
+        },
+        {
+          key: "mainDiagnosis",
+          label: "Основной диагноз",
+          labelFull: "Основной диагноз",
+          visible: false,
+        },
+        {
+          key: "comorbidDiagnoses",
+          label: "Сопутствующие диагнозы",
+          labelFull: "Сопутствующие диагнозы",
+          visible: false,
+        },
+        {
+          key: "patientGender",
+          label: "Пол",
+          labelFull: "Пол",
+          visible: false,
+        },
+        {
+          key: "patientBirthDate",
+          label: "Дата рождения",
+          labelFull: "Дата рождения",
+          visible: false,
+        },
+        {
+          key: "patientNationality",
+          label: "Национальность",
+          labelFull: "Национальность",
+          visible: false,
+        },
+        {
+          key: "researchInfo",
+          label: "Исследование",
+          labelFull: "Исследование",
+          visible: false,
+        },
       ] as ColumnConfig[],
       headerHelp: {
         sampleTypeIcon: "",
@@ -684,6 +917,8 @@ export default defineComponent({
         patientAge: "Возраст пациента на момент забора биоматериала",
         mainDiagnosis:
           "Основной диагноз, поставленный пациенту, у которого взят биоматериал",
+        comorbidDiagnoses:
+          "Сопутствующие диагнозы, зафиксированные при визите забора биоматериала",
         patientGender: "Пол пациента, у которого взят биоматериал",
         patientBirthDate: "Дата рождения пациента, у которого взят биоматериал",
         patientNationality:
@@ -707,6 +942,9 @@ export default defineComponent({
     };
   },
   computed: {
+    columnsForSelection(): ColumnConfig[] {
+      return this.columns.filter((c) => c.key !== "sampleTypeIcon");
+    },
     visibleColumns(): ColumnConfig[] {
       return this.columns.filter((column) => column.visible);
     },
@@ -726,44 +964,15 @@ export default defineComponent({
       );
     },
     filteredSamples(): Sample[] {
+      const activeFilters = this.filterRows.filter(
+        (r) => r.fieldKey && this.isFilterValueActive(r.fieldKey, r.value)
+      );
+      if (activeFilters.length === 0) {
+        return this.samples;
+      }
       return this.samples.filter((sample) => {
-        const matchesExpiry =
-          !this.expiryStatus ||
-          this.getSampleExpiryStatus(sample) === this.expiryStatus;
-        const matchesType =
-          !this.sampleTypeFilter ||
-          this.getSampleTypeName(sample.sampleTypeId) === this.sampleTypeFilter;
-        const visit = this.getVisitById(sample.visitId);
-        const matchesResearch =
-          this.researchFilter == null ||
-          visit?.researchId === this.researchFilter;
-        const patient = this.getPatientByVisit(sample.visitId);
-        const matchesMainDiagnosis =
-          this.mainDiagnosisFilter == null ||
-          patient?.mainDiagnosisId === this.mainDiagnosisFilter;
-        const age = visit?.ageAtCollection ?? null;
-        const minNum =
-          this.ageMinFilter === "" ||
-          this.ageMinFilter === null ||
-          this.ageMinFilter === undefined
-            ? null
-            : Number(this.ageMinFilter);
-        const maxNum =
-          this.ageMaxFilter === "" ||
-          this.ageMaxFilter === null ||
-          this.ageMaxFilter === undefined
-            ? null
-            : Number(this.ageMaxFilter);
-        const matchesAge =
-          age == null ||
-          ((minNum == null || !Number.isFinite(minNum) || age >= minNum) &&
-            (maxNum == null || !Number.isFinite(maxNum) || age <= maxNum));
-        return (
-          matchesExpiry &&
-          matchesResearch &&
-          matchesMainDiagnosis &&
-          matchesType &&
-          matchesAge
+        return activeFilters.every((f) =>
+          this.sampleMatchesFilter(sample, f.fieldKey, f.value)
         );
       });
     },
@@ -818,6 +1027,7 @@ export default defineComponent({
           patientsResponse,
           researchesResponse,
           diagnosesResponse,
+          nationalitiesResponse,
         ] = await Promise.all([
           axios.get("/references/sample-types"),
           axios.get("/references/sample-statuses"),
@@ -826,6 +1036,7 @@ export default defineComponent({
           axios.get("/patients"),
           axios.get("/researches"),
           axios.get("/references/diagnoses"),
+          axios.get("/references/nationalities"),
         ]);
         this.sampleTypes = this.sortByNameWithUnknown(
           typesResponse.data,
@@ -855,6 +1066,10 @@ export default defineComponent({
         this.diagnoses = [...diagnosesResponse.data].sort(
           (a: DiagnosisRef, b: DiagnosisRef) =>
             a.diagnosisName.localeCompare(b.diagnosisName, "ru-RU")
+        );
+        this.nationalities = [...nationalitiesResponse.data].sort(
+          (a: NationalityRef, b: NationalityRef) =>
+            a.nationalityName.localeCompare(b.nationalityName, "ru-RU")
         );
       } catch (error) {
         console.error("Ошибка при загрузке справочников:", error);
@@ -899,6 +1114,14 @@ export default defineComponent({
         return "—";
       }
       return `${diff.months} мес ${diff.days} дн`;
+    },
+    getActualStorageMonthsNumber(sample: Sample): number | null {
+      const startDate = this.getDateOnly(sample.createdAtSample);
+      const today = this.getTodayDateOnly();
+      if (!startDate || !today) return null;
+      const diff = this.getMonthsDaysDiff(startDate, today);
+      if (!diff) return null;
+      return diff.months + diff.days / 30;
     },
     getMonthsDaysDiff(startDate: Date, endDate: Date) {
       if (endDate < startDate) {
@@ -1208,13 +1431,148 @@ export default defineComponent({
       if (!value) return "";
       return value.replace(" ", "T").slice(0, 16);
     },
+    addFilterRow() {
+      this.filterRows.push({
+        fieldKey: "",
+        value: null as string | number | null,
+      });
+    },
+    removeFilterRow(index: number) {
+      this.filterRows.splice(index, 1);
+      if (this.filterRows.length === 0) {
+        this.filterRows.push({
+          fieldKey: "",
+          value: null as string | number | null,
+        });
+      }
+    },
+    availableFilterFieldsForRow(rowIndex: number) {
+      const usedKeys = new Set(
+        this.filterRows
+          .map((r, i) => (i !== rowIndex && r.fieldKey ? r.fieldKey : null))
+          .filter(Boolean)
+      );
+      return this.filterFieldDefinitions.filter(
+        (def) => !usedKeys.has(def.key)
+      );
+    },
+    isFilterValueActive(fieldKey: string, value: string | number | null) {
+      if (value === null || value === undefined) {
+        return false;
+      }
+      if (value === "" && fieldKey !== "barcode") {
+        return false;
+      }
+      if (fieldKey === "barcode") {
+        return typeof value === "string" && value.trim().length > 0;
+      }
+      if (
+        fieldKey === "ageMin" ||
+        fieldKey === "ageMax" ||
+        fieldKey === "initialQuantity" ||
+        fieldKey === "currentQuantity" ||
+        fieldKey === "recommendedStorageMonths" ||
+        fieldKey === "actualStorageMonthsMin"
+      ) {
+        const num = Number(value);
+        return Number.isFinite(num) && num >= 0;
+      }
+      if (
+        fieldKey === "createdAtSampleFrom" ||
+        fieldKey === "patientBirthDateFrom"
+      ) {
+        return typeof value === "string" && value.trim().length > 0;
+      }
+      return true;
+    },
+    sampleMatchesFilter(
+      sample: Sample,
+      fieldKey: string,
+      value: string | number | null
+    ): boolean {
+      if (fieldKey === "barcode") {
+        const search = String(value || "")
+          .trim()
+          .toLowerCase();
+        return !search || (sample.barcode || "").toLowerCase().includes(search);
+      }
+      if (fieldKey === "expiryStatus") {
+        return (
+          !value || this.getSampleExpiryStatus(sample) === (value as string)
+        );
+      }
+      if (fieldKey === "researchId") {
+        const visit = this.getVisitById(sample.visitId);
+        return value == null || visit?.researchId === value;
+      }
+      if (fieldKey === "mainDiagnosisId") {
+        const patient = this.getPatientByVisit(sample.visitId);
+        return value == null || patient?.mainDiagnosisId === value;
+      }
+      if (fieldKey === "comorbidDiagnosisId") {
+        const visit = this.getVisitById(sample.visitId);
+        const ids = visit?.comorbidDiagnosisIds ?? [];
+        return value == null || ids.includes(value as number);
+      }
+      if (fieldKey === "createdAtSampleFrom") {
+        const sampleDate = this.getDateOnly(sample.createdAtSample);
+        const filterDate = this.getDateOnly(value as string);
+        return !filterDate || !sampleDate || sampleDate >= filterDate;
+      }
+      if (fieldKey === "actualStorageMonthsMin") {
+        const months = this.getActualStorageMonthsNumber(sample);
+        const minVal = Number(value);
+        return !Number.isFinite(minVal) || (months != null && months >= minVal);
+      }
+      if (fieldKey === "patientBirthDateFrom") {
+        const patient = this.getPatientByVisit(sample.visitId);
+        const birthDate = patient?.birthDate
+          ? this.getDateOnly(patient.birthDate)
+          : null;
+        const filterDate = this.getDateOnly(value as string);
+        return !filterDate || !birthDate || birthDate >= filterDate;
+      }
+      if (fieldKey === "sampleTypeId") {
+        return value == null || sample.sampleTypeId === value;
+      }
+      if (fieldKey === "containerId") {
+        return value == null || sample.containerId === value;
+      }
+      if (fieldKey === "initialQuantity") {
+        return value == null || sample.initialQuantity === value;
+      }
+      if (fieldKey === "currentQuantity") {
+        return value == null || sample.currentQuantity === value;
+      }
+      if (fieldKey === "recommendedStorageMonths") {
+        return value == null || sample.recommendedStorageMonths === value;
+      }
+      if (fieldKey === "ageMin") {
+        const visit = this.getVisitById(sample.visitId);
+        const age = visit?.ageAtCollection ?? null;
+        const minNum = Number(value);
+        return age == null || !Number.isFinite(minNum) || age >= minNum;
+      }
+      if (fieldKey === "ageMax") {
+        const visit = this.getVisitById(sample.visitId);
+        const age = visit?.ageAtCollection ?? null;
+        const maxNum = Number(value);
+        return age == null || !Number.isFinite(maxNum) || age <= maxNum;
+      }
+      if (fieldKey === "patientGender") {
+        const patient = this.getPatientByVisit(sample.visitId);
+        return value == null || patient?.gender === value;
+      }
+      if (fieldKey === "patientNationalityId") {
+        const patient = this.getPatientByVisit(sample.visitId);
+        return value == null || patient?.nationalityId === value;
+      }
+      return true;
+    },
     resetFilters() {
-      this.expiryStatus = "";
-      this.researchFilter = null;
-      this.mainDiagnosisFilter = null;
-      this.sampleTypeFilter = "";
-      this.ageMinFilter = null;
-      this.ageMaxFilter = null;
+      this.filterRows = [
+        { fieldKey: "", value: null as string | number | null },
+      ];
     },
     getVisitLabel(visitId: number | null | undefined) {
       if (!visitId) return "—";
@@ -1322,7 +1680,7 @@ export default defineComponent({
       if (today.getDate() > expiryDate.getDate()) {
         remainingMonths -= 1;
       }
-      return remainingMonths <= 2 ? "YELLOW" : "GREEN";
+      return remainingMonths < 2 ? "YELLOW" : "GREEN";
     },
     getExpiryStatusLabel(status: string) {
       if (status === "RED") return "Просрочен";
@@ -1389,6 +1747,15 @@ export default defineComponent({
         const patient = this.getPatientByVisit(sample.visitId);
         return this.getDiagnosisDisplay(patient?.mainDiagnosisId ?? null);
       }
+      if (key === "comorbidDiagnoses") {
+        const visit = this.getVisitById(sample.visitId);
+        const ids = visit?.comorbidDiagnosisIds ?? [];
+        if (ids.length === 0) return "—";
+        const labels = ids
+          .map((id) => this.getDiagnosisDisplay(id))
+          .filter((l) => l && l !== "—");
+        return labels.length > 0 ? labels.join(";\n") : "—";
+      }
       if (key === "patientGender") {
         const patient = this.getPatientByVisit(sample.visitId);
         return this.getGenderText(patient?.gender);
@@ -1452,10 +1819,54 @@ h2 {
   border: 1px solid var(--border);
 }
 
-.filters {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+.filters-header {
+  margin-bottom: 16px;
+}
+
+.filters-header h3 {
+  margin: 0 0 8px 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.filters-hint {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.filters-list {
+  display: flex;
+  flex-direction: column;
   gap: 12px;
+  margin-bottom: 16px;
+}
+
+.filter-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-field-group {
+  flex: 0 0 180px;
+  min-width: 140px;
+}
+
+.filter-value-group {
+  flex: 0 0 220px;
+  max-width: 220px;
+}
+
+.filter-value-group .filter-placeholder {
+  display: inline-block;
+  padding: 10px;
+  color: var(--text-secondary);
+}
+
+.filter-row-actions {
+  flex-shrink: 0;
 }
 
 .columns-grid {

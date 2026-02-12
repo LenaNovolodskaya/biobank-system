@@ -8,7 +8,7 @@
         <li><router-link to="/researches">Исследования</router-link></li>
         <li><router-link to="/visits">Визиты</router-link></li>
         <li><router-link to="/patients">Пациенты</router-link></li>
-        <li><router-link to="/references">Справочники</router-link></li>
+        <!--<li><router-link to="/references">Справочники</router-link></li>-->
       </ul>
     </nav>
 
