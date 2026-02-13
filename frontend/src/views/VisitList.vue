@@ -389,6 +389,12 @@
               </div>
             </div>
           </div>
+          <div class="form-group">
+            <label for="modalComorbidDiagnoses">Сопутствующие диагнозы</label>
+            <div id="modalComorbidDiagnoses" class="comorbid-display">
+              {{ getModalComorbidDisplay() }}
+            </div>
+          </div>
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">
               {{ modalMode === "edit" ? "Обновить" : "Добавить" }}
@@ -470,6 +476,7 @@ interface PatientRef {
   patientBarcode: string;
   birthDate: string;
   mainDiagnosisId: number | null;
+  comorbidDiagnosisIds?: number[];
 }
 
 interface ResearchRef {
@@ -637,6 +644,22 @@ export default defineComponent({
         return "—";
       }
       const labels = visit.comorbidDiagnosisIds
+        .map((id) => this.getDiagnosisDisplay(id))
+        .filter((label) => label && label !== "—");
+      return labels.length > 0 ? labels.join(";\n") : "—";
+    },
+    getModalComorbidDisplay() {
+      if (!this.modalVisit.patientId) {
+        return "Выберите пациента";
+      }
+      const patient = this.patients.find(
+        (p) => p.patientId === this.modalVisit.patientId
+      );
+      const ids = patient?.comorbidDiagnosisIds;
+      if (!ids || ids.length === 0) {
+        return "—";
+      }
+      const labels = ids
         .map((id) => this.getDiagnosisDisplay(id))
         .filter((label) => label && label !== "—");
       return labels.length > 0 ? labels.join(";\n") : "—";
@@ -1150,11 +1173,23 @@ h2 {
   font-weight: 600;
 }
 
+.comorbid-display {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background-color: #e9dfd2;
+  padding: 8px;
+  min-height: 48px;
+  max-height: 120px;
+  overflow-y: auto;
+  white-space: pre-line;
+  color: var(--text-secondary);
+}
+
 .with-action .input-action {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 8px;
-  align-items: center;
+  align-items: start;
 }
 
 .multi-select {
@@ -1162,9 +1197,12 @@ h2 {
   border-radius: 6px;
   background-color: #e9dfd2;
   padding: 8px;
-  max-height: 160px;
-  overflow: auto;
+  height: 160px;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: grid;
+  grid-auto-rows: min-content;
   gap: 6px;
 }
 

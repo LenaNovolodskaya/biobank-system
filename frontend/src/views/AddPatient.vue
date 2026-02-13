@@ -542,7 +542,7 @@ h2 {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 8px;
-  align-items: center;
+  align-items: start;
 }
 
 .multi-select {
@@ -550,9 +550,12 @@ h2 {
   border-radius: 6px;
   background-color: #e9dfd2;
   padding: 8px;
-  max-height: 160px;
-  overflow: auto;
+  height: 120px;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: grid;
+  grid-auto-rows: min-content;
   gap: 6px;
 }
 

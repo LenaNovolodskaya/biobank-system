@@ -1230,7 +1230,21 @@ h2 {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 8px;
-  align-items: center;
+  align-items: start;
+}
+
+.multi-select {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background-color: #e9dfd2;
+  padding: 8px;
+  height: 160px;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: grid;
+  grid-auto-rows: min-content;
+  gap: 6px;
 }
 
 .icon-actions {
