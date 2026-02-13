@@ -49,6 +49,22 @@ CREATE TABLE patients (
 );
 COMMENT ON TABLE patients IS 'Пациенты (доноры биообразцов)';
 
+-- Сопутствующие диагнозы для пациентов (многие-ко-многим)
+CREATE TABLE patient_comorbid_diagnoses (
+    patient_id INT NOT NULL,
+    diagnosis_id INT NOT NULL,
+    PRIMARY KEY (patient_id, diagnosis_id),
+
+    CONSTRAINT fk_patient_comorbid_patient
+        FOREIGN KEY (patient_id)
+        REFERENCES patients(patient_id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_patient_comorbid_diagnosis
+        FOREIGN KEY (diagnosis_id)
+        REFERENCES diagnoses(diagnosis_id)
+);
+
 -- Группы исследований (справочник)
 CREATE TABLE research_groups (
     research_group_id SERIAL PRIMARY KEY,
@@ -117,22 +133,6 @@ CREATE TABLE visits (
         UNIQUE (patient_id, visit_number)
 );
 COMMENT ON TABLE visits IS 'Визиты пациентов для забора биоматериала';
-
--- Сопутствующие диагнозы для визитов (многие-ко-многим)
-CREATE TABLE visit_comorbid_diagnoses (
-    visit_id INT NOT NULL,
-    diagnosis_id INT NOT NULL,
-    PRIMARY KEY (visit_id, diagnosis_id),
-
-    CONSTRAINT fk_visit_comorbid_visit
-        FOREIGN KEY (visit_id)
-        REFERENCES visits(visit_id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT fk_visit_comorbid_diagnosis
-        FOREIGN KEY (diagnosis_id)
-        REFERENCES diagnoses(diagnosis_id)
-);
 
 
 -- =============================================

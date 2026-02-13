@@ -7,6 +7,7 @@ import lombok.AllArgsConstructor;
 import ru.healthfamily.biobank.model.Patient.Gender;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -23,6 +24,8 @@ public class PatientDTO {
     private String nationalityName;
 
     private Long mainDiagnosisId;
+
+    private List<Long> comorbidDiagnosisIds;
     
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAtPatient;

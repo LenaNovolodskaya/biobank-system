@@ -81,6 +81,30 @@
           <strong>Основной диагноз:</strong>
           {{ getDiagnosisDisplay(patient.mainDiagnosisId) }}
         </p>
+        <div class="comorbid-toggle-block">
+          <button
+            type="button"
+            class="btn-link"
+            @click.stop="toggleComorbidVisibility(patient.patientId)"
+          >
+            {{ getComorbidToggleLabel(patient) }}
+          </button>
+          <div
+            v-if="showComorbidPatientId === patient.patientId"
+            class="comorbid-list"
+          >
+            <template v-if="getComorbidDiagnosisLabels(patient).length > 0">
+              <div
+                v-for="(label, idx) in getComorbidDiagnosisLabels(patient)"
+                :key="idx"
+                class="comorbid-item"
+              >
+                {{ label }}
+              </div>
+            </template>
+            <div v-else class="comorbid-empty">—</div>
+          </div>
+        </div>
         <p class="nowrap">
           <strong>Дата регистрации:</strong>
           {{ formatDateTime(patient.createdAtPatient) }}
@@ -288,6 +312,66 @@
             </div>
           </div>
 
+          <div class="form-group with-action">
+            <label for="modalComorbidDiagnoses">Сопутствующие диагнозы</label>
+            <div class="input-action">
+              <div id="modalComorbidDiagnoses" class="multi-select">
+                <label
+                  v-for="diagnosis in diagnoses"
+                  :key="diagnosis.diagnosisId"
+                  class="checkbox-label"
+                >
+                  <input
+                    type="checkbox"
+                    :value="diagnosis.diagnosisId"
+                    v-model="modalPatient.comorbidDiagnosisIds"
+                  />
+                  {{ diagnosis.diagnosisName }}
+                </label>
+              </div>
+              <div class="icon-actions">
+                <button
+                  type="button"
+                  class="icon-button"
+                  @click="openDiagnosisModal()"
+                  aria-label="Добавить"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M11 5h2v14h-2zM5 11h14v2H5z" fill="currentColor" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="icon-button"
+                  :disabled="!getSingleComorbidDiagnosisId()"
+                  @click="openDiagnosisModal(getSingleComorbidDiagnosisId())"
+                  aria-label="Обновить"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="icon-button danger"
+                  :disabled="!getSingleComorbidDiagnosisId()"
+                  @click="deleteDiagnosisQuick(getSingleComorbidDiagnosisId())"
+                  aria-label="Удалить"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2H8l1-2z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div class="form-group">
             <label class="checkbox-label">
               <input v-model="modalPatient.informedConsent" type="checkbox" />
@@ -388,6 +472,7 @@ interface Patient {
   nationalityId?: number | null;
   nationalityName?: string;
   mainDiagnosisId?: number | null;
+  comorbidDiagnosisIds?: number[];
   informedConsent: boolean;
   createdAtPatient: string;
 }
@@ -399,6 +484,7 @@ interface PatientForm {
   createdAtPatient: string;
   nationalityId: number | null;
   mainDiagnosisId: number | null;
+  comorbidDiagnosisIds: number[];
   informedConsent: boolean;
 }
 
@@ -435,6 +521,7 @@ export default defineComponent({
         createdAtPatient: "",
         nationalityId: null,
         mainDiagnosisId: null,
+        comorbidDiagnosisIds: [],
         informedConsent: true,
       } as PatientForm,
       nationalities: [] as Nationality[],
@@ -450,6 +537,7 @@ export default defineComponent({
       diagDiagnosisId: null as number | null,
       diagDiagnosisCode: "",
       diagDiagnosisName: "",
+      showComorbidPatientId: null as number | null,
     };
   },
   computed: {
@@ -574,6 +662,8 @@ export default defineComponent({
         if (this.modalPatient.mainDiagnosisId === id) {
           this.modalPatient.mainDiagnosisId = null;
         }
+        this.modalPatient.comorbidDiagnosisIds =
+          this.modalPatient.comorbidDiagnosisIds.filter((x) => x !== id);
         await this.fetchDiagnoses();
       } catch (error) {
         this.errorMessage = "Ошибка при удалении диагноза";
@@ -710,6 +800,7 @@ export default defineComponent({
         createdAtPatient: this.toDateTimeLocal(patient.createdAtPatient),
         nationalityId: patient.nationalityId ?? null,
         mainDiagnosisId: patient.mainDiagnosisId ?? null,
+        comorbidDiagnosisIds: patient.comorbidDiagnosisIds ?? [],
         informedConsent: patient.informedConsent,
       };
       this.modalOpen = true;
@@ -798,6 +889,28 @@ export default defineComponent({
       }
       return fallbackMessage;
     },
+    toggleComorbidVisibility(patientId: number) {
+      this.showComorbidPatientId =
+        this.showComorbidPatientId === patientId ? null : patientId;
+    },
+    getComorbidToggleLabel(patient: Patient) {
+      return this.showComorbidPatientId === patient.patientId
+        ? "Скрыть сопутствующие диагнозы"
+        : "Показать сопутствующие диагнозы";
+    },
+    getComorbidDiagnosisLabels(patient: Patient) {
+      const ids = patient.comorbidDiagnosisIds ?? [];
+      if (ids.length === 0) return [];
+      return ids
+        .map((id) => this.getDiagnosisDisplay(id))
+        .filter((label) => label && label !== "—");
+    },
+    getSingleComorbidDiagnosisId() {
+      if (this.modalPatient.comorbidDiagnosisIds.length !== 1) {
+        return null;
+      }
+      return this.modalPatient.comorbidDiagnosisIds[0] ?? null;
+    },
     resetForm() {
       this.modalPatient = {
         patientBarcode: "",
@@ -806,6 +919,7 @@ export default defineComponent({
         createdAtPatient: this.getNowDateTimeLocal(),
         nationalityId: null,
         mainDiagnosisId: null,
+        comorbidDiagnosisIds: [],
         informedConsent: true,
       };
     },
@@ -973,6 +1087,38 @@ h2 {
 .patient-card.selected {
   border-color: #733d31;
   box-shadow: 0 0 0 3px rgba(154, 75, 59, 0.2);
+}
+
+.comorbid-toggle-block {
+  margin: 8px 0;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.btn-link:hover {
+  color: var(--accent-dark);
+}
+
+.comorbid-list {
+  margin-top: 8px;
+  padding-left: 0;
+}
+
+.comorbid-item {
+  margin-bottom: 4px;
+  white-space: normal;
+}
+
+.comorbid-empty {
+  color: var(--text-secondary);
 }
 
 .card-action-buttons {

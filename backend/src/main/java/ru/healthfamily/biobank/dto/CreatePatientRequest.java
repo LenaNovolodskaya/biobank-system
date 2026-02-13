@@ -8,6 +8,7 @@ import lombok.Data;
 import ru.healthfamily.biobank.model.Patient.Gender;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class CreatePatientRequest {
@@ -29,6 +30,8 @@ public class CreatePatientRequest {
     private Long nationalityId;
 
     private Long mainDiagnosisId;
+
+    private List<Long> comorbidDiagnosisIds;
     
     private Boolean informedConsent;
 }

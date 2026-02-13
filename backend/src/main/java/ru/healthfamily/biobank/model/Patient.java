@@ -9,6 +9,8 @@ import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "patients")
@@ -45,6 +47,11 @@ public class Patient {
     
     @Column(name = "informed_consent")
     private Boolean informedConsent;
+
+    @ElementCollection
+    @CollectionTable(name = "patient_comorbid_diagnoses", joinColumns = @JoinColumn(name = "patient_id"))
+    @Column(name = "diagnosis_id")
+    private List<Long> comorbidDiagnosisIds = new ArrayList<>();
     
     public enum Gender {
         UNKNOWN, MALE, FEMALE

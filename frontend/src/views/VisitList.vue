@@ -389,65 +389,6 @@
               </div>
             </div>
           </div>
-          <div class="form-group with-action">
-            <label for="modalComorbidDiagnoses">Сопутствующие диагнозы</label>
-            <div class="input-action">
-              <div id="modalComorbidDiagnoses" class="multi-select">
-                <label
-                  v-for="diagnosis in diagnoses"
-                  :key="diagnosis.diagnosisId"
-                  class="checkbox-label"
-                >
-                  <input
-                    type="checkbox"
-                    :value="diagnosis.diagnosisId"
-                    v-model="modalVisit.comorbidDiagnosisIds"
-                  />
-                  {{ diagnosis.diagnosisName }}
-                </label>
-              </div>
-              <div class="icon-actions">
-                <button
-                  type="button"
-                  class="icon-button"
-                  @click="openDiagnosisModal()"
-                  aria-label="Добавить"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M11 5h2v14h-2zM5 11h14v2H5z" fill="currentColor" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  class="icon-button"
-                  :disabled="!getSingleComorbidDiagnosisId()"
-                  @click="openDiagnosisModal(getSingleComorbidDiagnosisId())"
-                  aria-label="Обновить"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path
-                      d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25z"
-                      fill="currentColor"
-                    />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  class="icon-button danger"
-                  :disabled="!getSingleComorbidDiagnosisId()"
-                  @click="deleteDiagnosisQuick(getSingleComorbidDiagnosisId())"
-                  aria-label="Удалить"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path
-                      d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2H8l1-2z"
-                      fill="currentColor"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">
               {{ modalMode === "edit" ? "Обновить" : "Добавить" }}
@@ -522,7 +463,6 @@ interface VisitForm {
   collectionDate: string;
   ageAtCollection: number | null;
   diagnosisId: number | null;
-  comorbidDiagnosisIds: number[];
 }
 
 interface PatientRef {
@@ -569,7 +509,6 @@ export default defineComponent({
         collectionDate: "",
         ageAtCollection: null,
         diagnosisId: null,
-        comorbidDiagnosisIds: [],
       } as VisitForm,
       refModalOpen: false,
       refModalTitle: "",
@@ -702,12 +641,6 @@ export default defineComponent({
         .filter((label) => label && label !== "—");
       return labels.length > 0 ? labels.join(";\n") : "—";
     },
-    getSingleComorbidDiagnosisId() {
-      if (this.modalVisit.comorbidDiagnosisIds.length !== 1) {
-        return null;
-      }
-      return this.modalVisit.comorbidDiagnosisIds[0] ?? null;
-    },
     selectVisit(visitId: number) {
       this.selectedVisitId = this.selectedVisitId === visitId ? null : visitId;
     },
@@ -729,7 +662,6 @@ export default defineComponent({
         collectionDate: this.getNowLocalDatetime(),
         ageAtCollection: null,
         diagnosisId: null,
-        comorbidDiagnosisIds: [],
       };
       this.modalOpen = true;
     },
@@ -749,7 +681,6 @@ export default defineComponent({
         collectionDate: this.toDatetimeLocal(visit.collectionDate),
         ageAtCollection: visit.ageAtCollection,
         diagnosisId: visit.diagnosisId,
-        comorbidDiagnosisIds: visit.comorbidDiagnosisIds ?? [],
       };
       this.modalOpen = true;
     },
@@ -973,9 +904,6 @@ export default defineComponent({
         collectionDate: this.modalVisit.collectionDate,
         ageAtCollection: this.modalVisit.ageAtCollection,
         diagnosisId: this.modalVisit.diagnosisId,
-        comorbidDiagnosisIds: this.modalVisit.comorbidDiagnosisIds.map((id) =>
-          Number(id)
-        ),
       };
     },
     toDatetimeLocal(value: string) {

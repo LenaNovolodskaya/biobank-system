@@ -12,6 +12,7 @@ import ru.healthfamily.biobank.repository.PatientRepository;
 import ru.healthfamily.biobank.repository.SampleRepository;
 import ru.healthfamily.biobank.repository.VisitRepository;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -38,6 +39,10 @@ public class PatientService {
         patient.setBirthDate(request.getBirthDate());
         patient.setInformedConsent(request.getInformedConsent());
         patient.setMainDiagnosisId(request.getMainDiagnosisId());
+        List<Long> comorbid = request.getComorbidDiagnosisIds();
+        patient.setComorbidDiagnosisIds(
+                comorbid == null ? new ArrayList<>() : new ArrayList<>(comorbid)
+        );
         patient.setCreatedAtPatient(
                 request.getCreatedAtPatient() != null
                         ? request.getCreatedAtPatient()
@@ -93,6 +98,10 @@ public class PatientService {
         patient.setBirthDate(request.getBirthDate());
         patient.setInformedConsent(request.getInformedConsent());
         patient.setMainDiagnosisId(request.getMainDiagnosisId());
+        List<Long> comorbid = request.getComorbidDiagnosisIds();
+        patient.setComorbidDiagnosisIds(
+                comorbid == null ? new ArrayList<>() : new ArrayList<>(comorbid)
+        );
         if (request.getCreatedAtPatient() != null) {
             patient.setCreatedAtPatient(request.getCreatedAtPatient());
         }
@@ -139,6 +148,11 @@ public class PatientService {
         dto.setCreatedAtPatient(patient.getCreatedAtPatient());
         dto.setInformedConsent(patient.getInformedConsent());
         dto.setMainDiagnosisId(patient.getMainDiagnosisId());
+        dto.setComorbidDiagnosisIds(
+                patient.getComorbidDiagnosisIds() == null
+                        ? List.of()
+                        : new ArrayList<>(patient.getComorbidDiagnosisIds())
+        );
         
         if (patient.getNationality() != null) {
             dto.setNationalityId(patient.getNationality().getNationalityId());

@@ -1,20 +1,15 @@
 package ru.healthfamily.biobank.model;
 
-import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
 @Table(name = "visits")
@@ -45,9 +40,4 @@ public class Visit {
 
     @Column(name = "diagnosis_id")
     private Long diagnosisId;
-
-    @ElementCollection
-    @CollectionTable(name = "visit_comorbid_diagnoses", joinColumns = @JoinColumn(name = "visit_id"))
-    @Column(name = "diagnosis_id")
-    private List<Long> comorbidDiagnosisIds = new ArrayList<>();
 }

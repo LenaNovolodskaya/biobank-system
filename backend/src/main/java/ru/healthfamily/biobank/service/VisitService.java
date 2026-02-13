@@ -8,6 +8,7 @@ import org.springframework.web.server.ResponseStatusException;
 import ru.healthfamily.biobank.dto.CreateVisitRequest;
 import ru.healthfamily.biobank.dto.VisitDTO;
 import ru.healthfamily.biobank.model.Visit;
+import ru.healthfamily.biobank.repository.PatientRepository;
 import ru.healthfamily.biobank.repository.SampleRepository;
 import ru.healthfamily.biobank.repository.VisitRepository;
 import java.util.ArrayList;
@@ -20,6 +21,7 @@ public class VisitService {
 
     private final VisitRepository visitRepository;
     private final SampleRepository sampleRepository;
+    private final PatientRepository patientRepository;
 
     @Transactional
     public VisitDTO createVisit(CreateVisitRequest request) {
@@ -62,10 +64,6 @@ public class VisitService {
         visit.setCollectionDate(request.getCollectionDate());
         visit.setAgeAtCollection(request.getAgeAtCollection());
         visit.setDiagnosisId(request.getDiagnosisId());
-        List<Long> comorbid = request.getComorbidDiagnosisIds();
-        visit.setComorbidDiagnosisIds(
-                comorbid == null ? new ArrayList<>() : new ArrayList<>(comorbid)
-        );
     }
 
     private void validateVisitNumber(Long patientId, Integer visitNumber) {
@@ -129,6 +127,14 @@ public class VisitService {
     }
 
     private VisitDTO toDTO(Visit visit) {
+        List<Long> comorbidIds = List.of();
+        if (visit.getPatientId() != null) {
+            comorbidIds = patientRepository.findById(visit.getPatientId())
+                    .map(p -> p.getComorbidDiagnosisIds() == null
+                            ? List.<Long>of()
+                            : new ArrayList<>(p.getComorbidDiagnosisIds()))
+                    .orElse(List.of());
+        }
         return new VisitDTO(
                 visit.getVisitId(),
                 visit.getPatientId(),
@@ -137,9 +143,7 @@ public class VisitService {
                 visit.getCollectionDate(),
                 visit.getAgeAtCollection(),
                 visit.getDiagnosisId(),
-                visit.getComorbidDiagnosisIds() == null
-                        ? List.of()
-                        : new ArrayList<>(visit.getComorbidDiagnosisIds())
+                comorbidIds
         );
     }
 }

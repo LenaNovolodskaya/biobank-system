@@ -5,7 +5,6 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Data
 public class CreateVisitRequest {
@@ -29,6 +28,4 @@ public class CreateVisitRequest {
     private Integer ageAtCollection;
 
     private Long diagnosisId;
-
-    private List<Long> comorbidDiagnosisIds;
 }

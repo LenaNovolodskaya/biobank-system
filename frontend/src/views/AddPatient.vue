@@ -104,6 +104,66 @@
         </select>
       </div>
 
+      <div class="form-group with-action">
+        <label for="comorbidDiagnoses">Сопутствующие диагнозы</label>
+        <div class="input-action">
+          <div id="comorbidDiagnoses" class="multi-select">
+            <label
+              v-for="diagnosis in diagnoses"
+              :key="diagnosis.diagnosisId"
+              class="checkbox-label"
+            >
+              <input
+                type="checkbox"
+                :value="diagnosis.diagnosisId"
+                v-model="patient.comorbidDiagnosisIds"
+              />
+              {{ diagnosis.diagnosisName }}
+            </label>
+          </div>
+          <div class="icon-actions">
+            <button
+              type="button"
+              class="icon-button"
+              @click="openDiagnosisModal()"
+              aria-label="Добавить"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M11 5h2v14h-2zM5 11h14v2H5z" fill="currentColor" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="icon-button"
+              :disabled="!getSingleComorbidDiagnosisId()"
+              @click="openDiagnosisModal(getSingleComorbidDiagnosisId())"
+              aria-label="Обновить"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25z"
+                  fill="currentColor"
+                />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="icon-button danger"
+              :disabled="!getSingleComorbidDiagnosisId()"
+              @click="deleteDiagnosisQuick(getSingleComorbidDiagnosisId())"
+              aria-label="Удалить"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2H8l1-2z"
+                  fill="currentColor"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div class="form-group">
         <label class="checkbox-label">
           <input type="checkbox" v-model="patient.informedConsent" />
@@ -121,6 +181,47 @@
         </button>
       </div>
     </form>
+
+    <div
+      v-if="diagModalOpen"
+      class="modal-overlay"
+      @click.self="closeDiagnosisModal"
+    >
+      <div class="modal">
+        <div class="modal-header">
+          <h3>{{ diagModalTitle }}</h3>
+          <button class="btn btn-secondary" @click="closeDiagnosisModal">
+            Закрыть
+          </button>
+        </div>
+        <form class="form-grid" @submit.prevent="submitDiagnosisModal">
+          <div class="form-group">
+            <label for="diagIcd">Код МКБ‑10</label>
+            <input
+              id="diagIcd"
+              v-model="diagDiagnosisCode"
+              type="text"
+              class="form-control"
+            />
+          </div>
+          <div class="form-group">
+            <label for="diagName">Диагноз *</label>
+            <input
+              id="diagName"
+              v-model="diagDiagnosisName"
+              type="text"
+              required
+              class="form-control"
+            />
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+              {{ diagModalMode === "edit" ? "Обновить" : "Добавить" }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -134,6 +235,7 @@ interface Patient {
   birthDate: string;
   nationalityId: number | null;
   mainDiagnosisId: number | null;
+  comorbidDiagnosisIds: number[];
   informedConsent: boolean;
 }
 
@@ -158,6 +260,7 @@ export default defineComponent({
         birthDate: "",
         nationalityId: null as number | null,
         mainDiagnosisId: null as number | null,
+        comorbidDiagnosisIds: [],
         informedConsent: false,
       } as Patient,
       nationalities: [] as Nationality[],
@@ -165,6 +268,12 @@ export default defineComponent({
       loading: false,
       successMessage: "",
       errorMessage: "",
+      diagModalOpen: false,
+      diagModalTitle: "",
+      diagModalMode: "create" as "create" | "edit",
+      diagDiagnosisId: null as number | null,
+      diagDiagnosisCode: "",
+      diagDiagnosisName: "",
     };
   },
   computed: {
@@ -232,6 +341,91 @@ export default defineComponent({
         this.loading = false;
       }
     },
+    getSingleComorbidDiagnosisId() {
+      if (this.patient.comorbidDiagnosisIds.length !== 1) {
+        return null;
+      }
+      return this.patient.comorbidDiagnosisIds[0] ?? null;
+    },
+    openDiagnosisModal(presetId: number | null = null) {
+      this.diagDiagnosisId = presetId;
+      this.diagDiagnosisCode = "";
+      this.diagDiagnosisName = "";
+      this.diagModalMode = presetId ? "edit" : "create";
+      this.diagModalTitle =
+        this.diagModalMode === "edit" ? "Обновить диагноз" : "Добавить диагноз";
+      if (this.diagDiagnosisId) {
+        this.fillDiagnosisModal();
+      }
+      this.diagModalOpen = true;
+    },
+    closeDiagnosisModal() {
+      this.diagModalOpen = false;
+    },
+    fillDiagnosisModal() {
+      const diagnosis = this.diagnoses.find(
+        (item) => item.diagnosisId === this.diagDiagnosisId
+      );
+      this.diagDiagnosisCode = diagnosis?.icd10Code || "";
+      this.diagDiagnosisName = diagnosis?.diagnosisName || "";
+    },
+    async submitDiagnosisModal() {
+      if (!this.diagDiagnosisName.trim()) {
+        return;
+      }
+      if (this.diagModalMode === "edit") {
+        await this.updateDiagnosisModal();
+        return;
+      }
+      try {
+        await axios.post("/references/diagnoses", {
+          icd10Code: this.diagDiagnosisCode,
+          diagnosisName: this.diagDiagnosisName,
+        });
+        await this.fetchDiagnoses();
+        this.closeDiagnosisModal();
+      } catch (error) {
+        console.error("Ошибка при добавлении диагноза:", error);
+        this.errorMessage = "Ошибка при добавлении диагноза";
+      }
+    },
+    async updateDiagnosisModal() {
+      if (!this.diagDiagnosisId || !this.diagDiagnosisName.trim()) {
+        return;
+      }
+      try {
+        await axios.put(`/references/diagnoses/${this.diagDiagnosisId}`, {
+          icd10Code: this.diagDiagnosisCode,
+          diagnosisName: this.diagDiagnosisName,
+        });
+        await this.fetchDiagnoses();
+        this.closeDiagnosisModal();
+      } catch (error) {
+        console.error("Ошибка при обновлении диагноза:", error);
+        this.errorMessage = "Ошибка при обновлении диагноза";
+      }
+    },
+    async deleteDiagnosisQuick(id: number | null) {
+      if (!id) {
+        return;
+      }
+      const confirmed = window.confirm("Удалить выбранный диагноз?");
+      if (!confirmed) {
+        return;
+      }
+      try {
+        await axios.delete(`/references/diagnoses/${id}`);
+        if (this.patient.mainDiagnosisId === id) {
+          this.patient.mainDiagnosisId = null;
+        }
+        this.patient.comorbidDiagnosisIds =
+          this.patient.comorbidDiagnosisIds.filter((x) => x !== id);
+        await this.fetchDiagnoses();
+      } catch (error) {
+        console.error("Ошибка при удалении диагноза:", error);
+        this.errorMessage = "Ошибка при удалении диагноза";
+      }
+    },
     resetForm() {
       this.patient = {
         patientBarcode: "",
@@ -239,6 +433,7 @@ export default defineComponent({
         birthDate: "",
         nationalityId: null,
         mainDiagnosisId: null,
+        comorbidDiagnosisIds: [],
         informedConsent: false,
       };
     },
@@ -341,6 +536,104 @@ h2 {
 
 .checkbox-label input {
   cursor: pointer;
+}
+
+.with-action .input-action {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.multi-select {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background-color: #e9dfd2;
+  padding: 8px;
+  max-height: 160px;
+  overflow: auto;
+  display: grid;
+  gap: 6px;
+}
+
+.icon-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.icon-button {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #d8c9b6;
+  color: var(--text-secondary);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.icon-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.icon-button:hover:not(:disabled) {
+  background: #cfc1ad;
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.icon-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.icon-button.danger {
+  color: #7f3f32;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(22, 35, 43, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.modal {
+  background: var(--surface);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  max-width: 480px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.form-grid {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
 }
 
 .form-actions {
