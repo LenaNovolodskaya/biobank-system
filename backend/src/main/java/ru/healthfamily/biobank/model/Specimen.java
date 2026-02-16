@@ -6,16 +6,16 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "aliquots")
+@Table(name = "specimens")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Aliquot {
+public class Specimen {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "aliquot_id")
-    private Long aliquotId;
+    @Column(name = "specimen_id")
+    private Long specimenId;
 
     @Column(name = "barcode", nullable = false, unique = true)
     private String barcode;

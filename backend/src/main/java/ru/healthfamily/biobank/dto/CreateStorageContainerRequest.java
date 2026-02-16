@@ -1,31 +1,24 @@
 package ru.healthfamily.biobank.dto;
 
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
 public class CreateStorageContainerRequest {
 
-    private String shelfNumber;
+    /** Номер/название контейнера (например "A1", "Криобокс-1") */
+    private String containerNumber;
 
-    private String containerType;
+    /** ID существующего шаблона (если указан — используется он) */
+    private Long templateId;
 
-    private Integer containerNumber;
+    /** Название нового шаблона (если templateId не указан и шаблона нет — создаётся новый) */
+    private String templateName;
 
-    /** LETTER_DIGIT, DIGIT_LETTER, DIGIT_DIGIT, SEQUENTIAL */
+    /** Параметры для нового шаблона (если создаётся) */
+    private Integer rowsCount;
+    private Integer columnsCount;
     private String numberingType;
 
-    @Min(value = 1, message = "Количество строк должно быть больше 0")
-    private Integer rowsCount;
-
-    @Min(value = 1, message = "Количество столбцов должно быть больше 0")
-    private Integer columnsCount;
-
-    @NotNull(message = "Максимальное количество образцов обязательно")
-    @Min(value = 1, message = "Максимальное количество должно быть больше 0")
-    private Integer maxSamplesCount;
-
-    @Min(value = 0, message = "Текущее количество не может быть меньше 0")
-    private Integer currentSamplesCount;
+    /** Номер полки (только цифра) */
+    private Integer shelfNumber;
 }

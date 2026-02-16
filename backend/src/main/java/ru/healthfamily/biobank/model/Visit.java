@@ -37,7 +37,4 @@ public class Visit {
 
     @Column(name = "age_at_collection", nullable = false)
     private Integer ageAtCollection;
-
-    @Column(name = "diagnosis_id")
-    private Long diagnosisId;
 }

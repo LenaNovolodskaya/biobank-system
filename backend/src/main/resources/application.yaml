@@ -19,7 +19,8 @@ spring:
   
   jpa:
     hibernate:
-      # Для полной пересборки БД временно установите: create-drop или create
+      # create — пересоздать БД с нуля (удалить БД biobank, создать пустую)
+      # update — обновить схему при изменениях сущностей
       ddl-auto: update
     show-sql: true
     defer-datasource-initialization: true
@@ -31,8 +32,10 @@ spring:
   sql:
     init:
       mode: always
+      # Разделитель // — чтобы не разбивать PL/pgSQL функции по ; внутри тела
+      separator: "//"
       schema-locations: []
-      data-locations: classpath:data.sql
+      data-locations: classpath:data.sql, classpath:trigger.sql
   
   # Отключаем CORS на время разработки
   web:

@@ -28,5 +28,5 @@ public class SampleDTO {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAtSample;
 
-    private List<AliquotDTO> aliquots = new ArrayList<>();
+    private List<SpecimenDTO> specimens = new ArrayList<>();
 }

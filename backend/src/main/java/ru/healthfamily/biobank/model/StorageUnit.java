@@ -23,8 +23,9 @@ public class StorageUnit {
     @JoinColumn(name = "location_id", nullable = false)
     private StorageLocation location;
 
-    @Column(name = "unit_type", nullable = false)
-    private String unitType;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "unit_type_id", nullable = false)
+    private UnitType unitType;
 
     @Column(name = "unit_name", nullable = false)
     private String unitName;

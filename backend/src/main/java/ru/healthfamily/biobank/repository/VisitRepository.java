@@ -1,8 +1,6 @@
 package ru.healthfamily.biobank.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
-import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import ru.healthfamily.biobank.model.Visit;
 import java.time.LocalDateTime;
@@ -33,8 +31,4 @@ public interface VisitRepository extends JpaRepository<Visit, Long> {
     void deleteByPatientId(Long patientId);
 
     void deleteByResearchId(Long researchId);
-
-    @Modifying
-    @Query("update Visit v set v.diagnosisId = :diagnosisId where v.patientId = :patientId")
-    void updateDiagnosisForPatient(Long patientId, Long diagnosisId);
 }

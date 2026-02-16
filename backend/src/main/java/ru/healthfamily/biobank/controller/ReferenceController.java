@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import ru.healthfamily.biobank.model.ContainerTypeTemplate;
 import ru.healthfamily.biobank.model.Nationality;
+import ru.healthfamily.biobank.model.UnitType;
 import ru.healthfamily.biobank.model.Department;
 import ru.healthfamily.biobank.model.Diagnosis;
 import ru.healthfamily.biobank.model.FinancingSource;
@@ -16,6 +17,7 @@ import ru.healthfamily.biobank.repository.DiagnosisRepository;
 import ru.healthfamily.biobank.repository.FinancingSourceRepository;
 import ru.healthfamily.biobank.repository.ContainerTypeTemplateRepository;
 import ru.healthfamily.biobank.repository.NationalityRepository;
+import ru.healthfamily.biobank.repository.UnitTypeRepository;
 import ru.healthfamily.biobank.repository.ResearchGroupRepository;
 import ru.healthfamily.biobank.repository.SampleStatusRepository;
 import ru.healthfamily.biobank.repository.SampleTypeRepository;
@@ -28,6 +30,7 @@ import java.util.List;
 public class ReferenceController {
     
     private final ContainerTypeTemplateRepository containerTypeTemplateRepository;
+    private final UnitTypeRepository unitTypeRepository;
     private final NationalityRepository nationalityRepository;
     private final SampleTypeRepository sampleTypeRepository;
     private final SampleStatusRepository sampleStatusRepository;
@@ -69,13 +72,36 @@ public class ReferenceController {
     
     @GetMapping("/container-templates")
     public ResponseEntity<List<ContainerTypeTemplate>> getContainerTemplates() {
-        return ResponseEntity.ok(containerTypeTemplateRepository.findAllByOrderByDisplayOrderAsc());
+        return ResponseEntity.ok(containerTypeTemplateRepository.findAll());
+    }
+
+    @PostMapping("/container-templates")
+    public ResponseEntity<ContainerTypeTemplate> createContainerTemplate(@RequestBody java.util.Map<String, Object> body) {
+        String name = String.valueOf(body.getOrDefault("templateName", "")).trim();
+        if (name.isEmpty()) {
+            throw new RuntimeException("Название шаблона обязательно");
+        }
+        Integer rows = body.get("rowsCount") != null ? ((Number) body.get("rowsCount")).intValue() : 1;
+        Integer cols = body.get("columnsCount") != null ? ((Number) body.get("columnsCount")).intValue() : 1;
+        String numbering = body.get("numberingType") != null ? String.valueOf(body.get("numberingType")) : "SEQUENTIAL";
+        ContainerTypeTemplate t = new ContainerTypeTemplate();
+        t.setTemplateName(name);
+        t.setRowsCount(rows);
+        t.setColumnsCount(cols);
+        t.setMaxSamplesCount(rows * cols);
+        t.setNumberingType(numbering);
+        return ResponseEntity.ok(containerTypeTemplateRepository.save(t));
     }
 
     @GetMapping("/genders")
     public ResponseEntity<List<String>> getAllGenders() {
         List<String> genders = List.of("UNKNOWN", "MALE", "FEMALE");
         return ResponseEntity.ok(genders);
+    }
+
+    @GetMapping("/unit-types")
+    public ResponseEntity<List<UnitType>> getUnitTypes() {
+        return ResponseEntity.ok(unitTypeRepository.findAll());
     }
 
     @GetMapping("/sample-types")

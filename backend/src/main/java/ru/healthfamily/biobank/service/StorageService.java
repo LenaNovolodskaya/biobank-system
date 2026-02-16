@@ -9,12 +9,17 @@ import ru.healthfamily.biobank.dto.CreateStorageUnitRequest;
 import ru.healthfamily.biobank.dto.StorageContainerDTO;
 import ru.healthfamily.biobank.dto.StorageLocationDTO;
 import ru.healthfamily.biobank.dto.StorageUnitDTO;
+import ru.healthfamily.biobank.model.ContainerTypeTemplate;
 import ru.healthfamily.biobank.model.StorageContainer;
 import ru.healthfamily.biobank.model.StorageLocation;
 import ru.healthfamily.biobank.model.StorageUnit;
+import ru.healthfamily.biobank.model.UnitType;
+import ru.healthfamily.biobank.repository.ContainerTypeTemplateRepository;
 import ru.healthfamily.biobank.repository.StorageContainerRepository;
 import ru.healthfamily.biobank.repository.StorageLocationRepository;
 import ru.healthfamily.biobank.repository.StorageUnitRepository;
+import ru.healthfamily.biobank.repository.UnitTypeRepository;
+
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -25,6 +30,8 @@ public class StorageService {
     private final StorageLocationRepository locationRepository;
     private final StorageUnitRepository unitRepository;
     private final StorageContainerRepository containerRepository;
+    private final ContainerTypeTemplateRepository templateRepository;
+    private final UnitTypeRepository unitTypeRepository;
 
     @Transactional
     public StorageLocationDTO createLocation(CreateStorageLocationRequest request) {
@@ -40,9 +47,11 @@ public class StorageService {
     public StorageUnitDTO addUnitToLocation(Long locationId, CreateStorageUnitRequest request) {
         StorageLocation location = locationRepository.findById(locationId)
                 .orElseThrow(() -> new RuntimeException("Локация не найдена"));
+        UnitType unitType = unitTypeRepository.findById(request.getUnitTypeId())
+                .orElseThrow(() -> new RuntimeException("Тип хранилища не найден"));
         StorageUnit unit = new StorageUnit();
         unit.setLocation(location);
-        unit.setUnitType(request.getUnitType());
+        unit.setUnitType(unitType);
         unit.setUnitName(request.getUnitName());
         unit.setShelvesCount(request.getShelvesCount());
         return convertUnitToDTO(unitRepository.save(unit));
@@ -52,17 +61,40 @@ public class StorageService {
     public StorageContainerDTO addContainerToUnit(Long unitId, CreateStorageContainerRequest request) {
         StorageUnit unit = unitRepository.findById(unitId)
                 .orElseThrow(() -> new RuntimeException("Хранилище не найдено"));
+        ContainerTypeTemplate template = resolveOrCreateTemplate(request);
         StorageContainer container = new StorageContainer();
         container.setUnit(unit);
-        container.setShelfNumber(request.getShelfNumber());
-        container.setContainerType(request.getContainerType());
+        container.setTemplate(template);
         container.setContainerNumber(request.getContainerNumber());
-        container.setNumberingType(request.getNumberingType());
-        applyContainerLayout(container, request);
-        Integer current = request.getCurrentSamplesCount();
-        container.setCurrentSamplesCount(current == null ? 0 : current);
-        validateContainerCapacity(container);
+        container.setShelfNumber(request.getShelfNumber());
+        container.setCurrentSamplesCount(0);
         return convertContainerToDTO(containerRepository.save(container));
+    }
+
+    /** Находит шаблон по ID или создаёт новый, если передан templateName и шаблона ещё нет */
+    private ContainerTypeTemplate resolveOrCreateTemplate(CreateStorageContainerRequest request) {
+        if (request.getTemplateId() != null) {
+            return templateRepository.findById(request.getTemplateId())
+                    .orElseThrow(() -> new RuntimeException("Шаблон контейнера не найден"));
+        }
+        String name = request.getTemplateName();
+        if (name == null || name.isBlank()) {
+            throw new RuntimeException("Укажите templateId или templateName для шаблона контейнера");
+        }
+        return templateRepository.findByTemplateNameIgnoreCase(name.trim())
+                .orElseGet(() -> {
+                    Integer rows = request.getRowsCount() != null ? request.getRowsCount() : 1;
+                    Integer cols = request.getColumnsCount() != null ? request.getColumnsCount() : 1;
+                    String numbering = request.getNumberingType() != null && !request.getNumberingType().isBlank()
+                            ? request.getNumberingType() : "SEQUENTIAL";
+                    ContainerTypeTemplate t = new ContainerTypeTemplate();
+                    t.setTemplateName(name.trim());
+                    t.setRowsCount(rows);
+                    t.setColumnsCount(cols);
+                    t.setMaxSamplesCount(rows * cols);
+                    t.setNumberingType(numbering);
+                    return templateRepository.save(t);
+                });
     }
 
     @Transactional(readOnly = true)
@@ -101,7 +133,9 @@ public class StorageService {
     public StorageUnitDTO updateUnit(Long unitId, CreateStorageUnitRequest request) {
         StorageUnit unit = unitRepository.findById(unitId)
                 .orElseThrow(() -> new RuntimeException("Хранилище не найдено"));
-        unit.setUnitType(request.getUnitType());
+        UnitType unitType = unitTypeRepository.findById(request.getUnitTypeId())
+                .orElseThrow(() -> new RuntimeException("Тип хранилища не найден"));
+        unit.setUnitType(unitType);
         unit.setUnitName(request.getUnitName());
         unit.setShelvesCount(request.getShelvesCount());
         return convertUnitToDTO(unitRepository.save(unit));
@@ -111,18 +145,10 @@ public class StorageService {
     public StorageContainerDTO updateContainer(Long containerId, CreateStorageContainerRequest request) {
         StorageContainer container = containerRepository.findById(containerId)
                 .orElseThrow(() -> new RuntimeException("Контейнер не найден"));
-        container.setShelfNumber(request.getShelfNumber());
-        container.setContainerType(request.getContainerType());
+        ContainerTypeTemplate template = resolveOrCreateTemplate(request);
+        container.setTemplate(template);
         container.setContainerNumber(request.getContainerNumber());
-        if (request.getNumberingType() != null) {
-            container.setNumberingType(request.getNumberingType());
-        }
-        applyContainerLayout(container, request);
-        Integer current = request.getCurrentSamplesCount();
-        if (current != null) {
-            container.setCurrentSamplesCount(current);
-        }
-        validateContainerCapacity(container);
+        container.setShelfNumber(request.getShelfNumber());
         return convertContainerToDTO(containerRepository.save(container));
     }
 
@@ -168,7 +194,8 @@ public class StorageService {
         return new StorageUnitDTO(
                 unit.getUnitId(),
                 unit.getLocation().getLocationId(),
-                unit.getUnitType(),
+                unit.getUnitType().getUnitTypeId(),
+                unit.getUnitType().getUnitTypeName(),
                 unit.getUnitName(),
                 unit.getShelvesCount(),
                 containers
@@ -176,36 +203,19 @@ public class StorageService {
     }
 
     private StorageContainerDTO convertContainerToDTO(StorageContainer container) {
+        ContainerTypeTemplate t = container.getTemplate();
         return new StorageContainerDTO(
                 container.getContainerId(),
-                container.getShelfNumber(),
-                container.getContainerType(),
                 container.getContainerNumber(),
-                container.getRowsCount(),
-                container.getColumnsCount(),
-                container.getMaxSamplesCount(),
                 container.getCurrentSamplesCount(),
-                container.getNumberingType()
+                container.getUnit().getUnitId(),
+                container.getShelfNumber(),
+                t.getTemplateId(),
+                t.getTemplateName(),
+                t.getRowsCount(),
+                t.getColumnsCount(),
+                t.getMaxSamplesCount(),
+                t.getNumberingType()
         );
-    }
-
-    private void applyContainerLayout(StorageContainer container, CreateStorageContainerRequest request) {
-        Integer rows = request.getRowsCount();
-        Integer columns = request.getColumnsCount();
-        container.setRowsCount(rows);
-        container.setColumnsCount(columns);
-        if (rows != null && columns != null) {
-            container.setMaxSamplesCount(rows * columns);
-        } else {
-            container.setMaxSamplesCount(request.getMaxSamplesCount());
-        }
-    }
-
-    private void validateContainerCapacity(StorageContainer container) {
-        Integer current = container.getCurrentSamplesCount();
-        Integer max = container.getMaxSamplesCount();
-        if (current != null && max != null && current > max) {
-            throw new RuntimeException("Текущее количество превышает вместимость контейнера");
-        }
     }
 }

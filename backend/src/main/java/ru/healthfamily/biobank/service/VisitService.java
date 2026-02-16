@@ -63,7 +63,6 @@ public class VisitService {
         visit.setVisitNumber(request.getVisitNumber());
         visit.setCollectionDate(request.getCollectionDate());
         visit.setAgeAtCollection(request.getAgeAtCollection());
-        visit.setDiagnosisId(request.getDiagnosisId());
     }
 
     private void validateVisitNumber(Long patientId, Integer visitNumber) {
@@ -128,12 +127,15 @@ public class VisitService {
 
     private VisitDTO toDTO(Visit visit) {
         List<Long> comorbidIds = List.of();
+        Long diagnosisId = null;
         if (visit.getPatientId() != null) {
-            comorbidIds = patientRepository.findById(visit.getPatientId())
+            var patientOpt = patientRepository.findById(visit.getPatientId());
+            comorbidIds = patientOpt
                     .map(p -> p.getComorbidDiagnosisIds() == null
                             ? List.<Long>of()
                             : new ArrayList<>(p.getComorbidDiagnosisIds()))
                     .orElse(List.of());
+            diagnosisId = patientOpt.map(p -> p.getMainDiagnosisId()).orElse(null);
         }
         return new VisitDTO(
                 visit.getVisitId(),
@@ -142,7 +144,7 @@ public class VisitService {
                 visit.getVisitNumber(),
                 visit.getCollectionDate(),
                 visit.getAgeAtCollection(),
-                visit.getDiagnosisId(),
+                diagnosisId,
                 comorbidIds
         );
     }

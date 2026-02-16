@@ -24,9 +24,6 @@
 
     <div class="card table-card">
       <p v-if="loading">Загрузка...</p>
-      <div v-else-if="researches.length === 0" class="empty-state">
-        Нет исследований
-      </div>
       <div v-else class="table-wrapper" @click="activeHeaderHelp = null">
         <table class="research-table">
           <thead>
@@ -144,6 +141,9 @@
             </tr>
           </thead>
           <tbody>
+            <tr v-if="researches.length === 0" class="empty-row">
+              <td colspan="9" class="empty-state">Нет исследований</td>
+            </tr>
             <tr
               v-for="research in researches"
               :key="research.researchId"

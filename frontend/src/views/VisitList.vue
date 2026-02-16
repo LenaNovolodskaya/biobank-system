@@ -24,7 +24,6 @@
 
     <div class="card table-card">
       <p v-if="loading">Загрузка...</p>
-      <div v-else-if="visits.length === 0" class="empty-state">Нет визитов</div>
       <div v-else class="table-wrapper" @click="activeHeaderHelp = null">
         <table class="visit-table">
           <thead>
@@ -178,6 +177,9 @@
             </tr>
           </thead>
           <tbody>
+            <tr v-if="visits.length === 0" class="empty-row">
+              <td colspan="10" class="empty-state">Нет визитов</td>
+            </tr>
             <tr
               v-for="visit in visits"
               :key="visit.visitId"

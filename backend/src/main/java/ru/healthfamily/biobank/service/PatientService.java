@@ -14,7 +14,6 @@ import ru.healthfamily.biobank.repository.VisitRepository;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -85,7 +84,6 @@ public class PatientService {
     public PatientDTO updatePatient(Long id, CreatePatientRequest request) {
         Patient patient = patientRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Пациент не найден"));
-        Long previousMainDiagnosisId = patient.getMainDiagnosisId();
 
         String newBarcode = request.getPatientBarcode();
         if (!patient.getPatientBarcode().equals(newBarcode)
@@ -114,14 +112,7 @@ public class PatientService {
             patient.setNationality(null);
         }
 
-        Patient savedPatient = patientRepository.save(patient);
-        if (!Objects.equals(previousMainDiagnosisId, savedPatient.getMainDiagnosisId())) {
-            visitRepository.updateDiagnosisForPatient(
-                    savedPatient.getPatientId(),
-                    savedPatient.getMainDiagnosisId()
-            );
-        }
-        return convertToDTO(savedPatient);
+        return convertToDTO(patientRepository.save(patient));
     }
 
     @Transactional

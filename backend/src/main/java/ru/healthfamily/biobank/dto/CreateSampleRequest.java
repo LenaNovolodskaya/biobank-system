@@ -38,11 +38,11 @@ public class CreateSampleRequest {
     private LocalDateTime collectionDate;
 
     @Valid
-    private List<AliquotItem> aliquots = new ArrayList<>();
+    private List<SpecimenItem> specimens = new ArrayList<>();
 
     @Data
-    public static class AliquotItem {
-        @NotBlank(message = "Штрихкод аликвоты обязателен")
+    public static class SpecimenItem {
+        @NotBlank(message = "Штрихкод образца обязателен")
         private String barcode;
         private Long sampleStatusId;
         private Long containerId;

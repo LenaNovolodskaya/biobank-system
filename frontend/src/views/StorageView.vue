@@ -144,7 +144,7 @@
                     :class="{ active: selectedUnitId === unit.unitId }"
                     @click="selectUnit(unit.unitId)"
                   >
-                    {{ unit.unitName }} ({{ unit.unitType }})
+                    {{ unit.unitName }} ({{ unit.unitTypeName }})
                   </button>
 
                   <div
@@ -253,8 +253,16 @@
                               "
                               @click="selectContainer(container.containerId)"
                             >
-                              {{ container.containerType || "Контейнер" }}
-                              №{{ container.containerNumber ?? "—" }}
+                              {{
+                                container.templateName ||
+                                container.containerNumber ||
+                                "Контейнер"
+                              }}
+                              {{
+                                container.containerNumber
+                                  ? `№${container.containerNumber}`
+                                  : ""
+                              }}
                             </button>
                           </div>
                         </div>
@@ -607,7 +615,7 @@
                   :key="container.containerId"
                   :value="container.containerId"
                 >
-                  {{ container.containerType || "Контейнер" }}
+                  {{ container.templateName || "Контейнер" }}
                   №{{ container.containerNumber ?? "—" }}
                 </option>
               </select>
@@ -616,19 +624,19 @@
               <label>Аликвоты</label>
               <div v-if="drawerTubeCount > 0" class="tube-grid">
                 <div
-                  v-for="(aliquot, index) in drawerSampleForm.aliquots"
+                  v-for="(specimen, index) in drawerSampleForm.specimens"
                   :key="index"
                   class="tube-row"
                 >
                   <div class="tube-label">Аликвота {{ index + 1 }}</div>
                   <input
-                    v-model="aliquot.barcode"
+                    v-model="specimen.barcode"
                     type="text"
                     class="form-control"
                     placeholder="Штрихкод"
                   />
                   <select
-                    v-model.number="aliquot.sampleStatusId"
+                    v-model.number="specimen.sampleStatusId"
                     class="form-control"
                   >
                     <option :value="null">Не указано</option>
@@ -641,13 +649,13 @@
                     </option>
                   </select>
                   <select
-                    v-model="aliquot.positionInContainer"
+                    v-model="specimen.positionInContainer"
                     class="form-control"
                     :disabled="!drawerSampleForm.containerId"
                   >
                     <option value="">Не указано</option>
                     <option
-                      v-for="pos in drawerPositionsForAliquot(
+                      v-for="pos in drawerPositionsForSpecimen(
                         drawerSampleForm.containerId,
                         index
                       )"
@@ -730,15 +738,22 @@
 
           <template v-if="modalType === 'unit'">
             <div class="form-group">
-              <label for="modalUnitType">Тип *</label>
-              <input
+              <label for="modalUnitType">Тип хранилища *</label>
+              <select
                 id="modalUnitType"
-                v-model="modalUnit.unitType"
-                required
-                type="text"
+                v-model.number="modalUnit.unitTypeId"
                 class="form-control"
-                placeholder="Холодильник, шкаф и т.д."
-              />
+                required
+              >
+                <option :value="null">— Выберите тип —</option>
+                <option
+                  v-for="ut in unitTypes"
+                  :key="ut.unitTypeId"
+                  :value="ut.unitTypeId"
+                >
+                  {{ ut.unitTypeName }}
+                </option>
+              </select>
             </div>
             <div class="form-group">
               <label for="modalUnitName">Название *</label>
@@ -765,16 +780,14 @@
 
           <template v-if="modalType === 'container'">
             <div class="form-group">
-              <label for="modalContainerTemplate">Шаблон контейнера</label>
+              <label for="modalContainerTemplate">Шаблон контейнера *</label>
               <select
                 id="modalContainerTemplate"
-                v-model="selectedContainerTemplateId"
+                v-model.number="modalContainer.templateId"
                 class="form-control"
-                @change="onContainerTemplateSelect"
+                required
               >
-                <option value="">
-                  — Выберите шаблон или введите вручную —
-                </option>
+                <option :value="null">— Выберите шаблон —</option>
                 <option
                   v-for="t in containerTemplates"
                   :key="t.templateId"
@@ -786,93 +799,33 @@
               </select>
             </div>
             <div class="form-group">
-              <label for="modalContainerType">Тип упаковки</label>
-              <input
-                id="modalContainerType"
-                v-model="modalContainer.containerType"
-                type="text"
-                class="form-control"
-                placeholder="Штатив, коробка"
-              />
-            </div>
-            <div class="form-group">
-              <label for="modalShelf">Полка</label>
-              <input
-                id="modalShelf"
-                v-model="modalContainer.shelfNumber"
-                type="text"
-                class="form-control"
-                placeholder="Полка 1"
-              />
-            </div>
-            <div class="form-group">
               <label for="modalContainerNumber">Номер контейнера</label>
               <input
                 id="modalContainerNumber"
-                v-model.number="modalContainer.containerNumber"
-                type="number"
-                min="1"
+                v-model="modalContainer.containerNumber"
+                type="text"
                 class="form-control"
+                placeholder="A1, 1, Криобокс-1"
               />
             </div>
             <div class="form-group">
-              <label for="modalRowsCount">Строк</label>
+              <label for="modalShelf">Номер полки</label>
               <input
-                id="modalRowsCount"
-                v-model.number="modalContainer.rowsCount"
+                id="modalShelf"
+                v-model.number="modalContainer.shelfNumber"
                 type="number"
                 min="1"
                 class="form-control"
-                placeholder="Например, 8"
+                placeholder="1"
               />
             </div>
-            <div class="form-group">
-              <label for="modalColumnsCount">Столбцов</label>
+            <div v-if="modalMode === 'edit'" class="form-group">
+              <label>Текущее кол-во образцов</label>
               <input
-                id="modalColumnsCount"
-                v-model.number="modalContainer.columnsCount"
+                :value="modalContainer.currentSamplesCount"
                 type="number"
-                min="1"
                 class="form-control"
-                placeholder="Например, 12"
-              />
-            </div>
-            <div class="form-group">
-              <label for="modalMaxSamples">Макс. образцов *</label>
-              <input
-                id="modalMaxSamples"
-                v-model.number="modalContainer.maxSamplesCount"
-                required
-                type="number"
-                min="1"
-                class="form-control"
-                :readonly="
-                  !!modalContainer.rowsCount && !!modalContainer.columnsCount
-                "
-              />
-            </div>
-            <div class="form-group">
-              <label for="modalNumberingType">Тип нумерации</label>
-              <select
-                id="modalNumberingType"
-                v-model="modalContainer.numberingType"
-                class="form-control"
-              >
-                <option value="">— По умолчанию —</option>
-                <option value="LETTER_DIGIT">Буква+цифра (A1, B2, …)</option>
-                <option value="DIGIT_LETTER">Цифра+буква (1A, 2B, …)</option>
-                <option value="DIGIT_DIGIT">Цифра/цифра (1/1, 5/5, …)</option>
-                <option value="SEQUENTIAL">Сквозная (1–25, …)</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="modalCurrentSamples">Текущее кол-во</label>
-              <input
-                id="modalCurrentSamples"
-                v-model.number="modalContainer.currentSamplesCount"
-                type="number"
-                min="0"
-                class="form-control"
+                readonly
               />
             </div>
           </template>
@@ -895,14 +848,16 @@ import BarcodeSvg from "@/components/BarcodeSvg.vue";
 
 interface StorageContainer {
   containerId: number;
-  shelfNumber: string | null;
-  containerType: string | null;
-  containerNumber: number | null;
-  rowsCount: number | null;
-  columnsCount: number | null;
-  maxSamplesCount: number;
+  containerNumber: string | null;
   currentSamplesCount: number;
-  numberingType: string | null;
+  unitId: number;
+  shelfNumber: number | null;
+  templateId: number;
+  templateName: string;
+  rowsCount: number;
+  columnsCount: number;
+  maxSamplesCount: number;
+  numberingType: string;
 }
 
 interface ContainerTypeTemplate {
@@ -910,14 +865,15 @@ interface ContainerTypeTemplate {
   templateName: string;
   rowsCount: number;
   columnsCount: number;
+  maxSamplesCount: number;
   numberingType: string;
-  displayOrder: number | null;
 }
 
 interface StorageUnit {
   unitId: number;
   locationId: number;
-  unitType: string;
+  unitTypeId: number;
+  unitTypeName: string;
   unitName: string;
   shelvesCount: number | null;
   containers: StorageContainer[];
@@ -932,8 +888,8 @@ interface StorageLocation {
   units: StorageUnit[];
 }
 
-interface Aliquot {
-  aliquotId: number;
+interface Specimen {
+  specimenId: number;
   barcode: string;
   sampleId: number;
   sampleStatusId: number | null;
@@ -953,7 +909,7 @@ interface Sample {
   actualStorageMonths: number | null;
   expiryStatus: string;
   createdAtSample: string;
-  aliquots?: Aliquot[];
+  specimens?: Specimen[];
 }
 
 interface VisitRef {
@@ -1006,20 +962,16 @@ interface NewLocationForm {
 }
 
 interface NewUnitForm {
-  unitType: string;
+  unitTypeId: number | null;
   unitName: string;
   shelvesCount: number | null;
 }
 
 interface NewContainerForm {
-  shelfNumber: string;
-  containerType: string;
-  containerNumber: number | null;
-  rowsCount: number | null;
-  columnsCount: number | null;
-  maxSamplesCount: number | null;
-  currentSamplesCount: number | null;
-  numberingType: string | null;
+  templateId: number | null;
+  containerNumber: string;
+  shelfNumber: number | null;
+  currentSamplesCount?: number;
 }
 
 export default defineComponent({
@@ -1049,21 +1001,15 @@ export default defineComponent({
         description: "",
       } as NewLocationForm,
       modalUnit: {
-        unitType: "",
+        unitTypeId: null,
         unitName: "",
         shelvesCount: null,
       } as NewUnitForm,
       modalContainer: {
-        shelfNumber: "",
-        containerType: "",
-        containerNumber: null,
-        rowsCount: null,
-        columnsCount: null,
-        maxSamplesCount: null,
-        currentSamplesCount: null,
-        numberingType: null,
+        templateId: null,
+        containerNumber: "",
+        shelfNumber: null,
       } as NewContainerForm,
-      selectedContainerTemplateId: "" as string,
       dragContainerId: null as number | null,
       dragSourceShelfIndex: null as number | null,
       containerRefs: [] as StorageContainer[],
@@ -1074,12 +1020,13 @@ export default defineComponent({
       sampleTypes: [] as SampleTypeRef[],
       sampleStatuses: [] as SampleStatusRef[],
       containerTemplates: [] as ContainerTypeTemplate[],
+      unitTypes: [] as Array<{ unitTypeId: number; unitTypeName: string }>,
       sampleDrawerOpen: false,
       sampleDrawerMode: null as "details" | "create" | "edit" | null,
       drawerFormInitializing: false,
       selectedCell: null as { containerId: number; label: string } | null,
       selectedSample: null as Sample | null,
-      selectedAliquot: null as Aliquot | null,
+      selectedSpecimen: null as Specimen | null,
       drawerSampleForm: {
         visitId: null as number | null,
         barcode: "",
@@ -1091,7 +1038,7 @@ export default defineComponent({
         expiryStatus: "",
         containerId: null as number | null,
         collectionDate: "",
-        aliquots: [] as Array<{
+        specimens: [] as Array<{
           barcode: string;
           sampleStatusId: number | null;
           containerId: number | null;
@@ -1120,12 +1067,6 @@ export default defineComponent({
       this.selectedContainerId = null;
       this.closeSampleDrawer();
     },
-    "modalContainer.rowsCount"() {
-      this.syncContainerCapacity();
-    },
-    "modalContainer.columnsCount"() {
-      this.syncContainerCapacity();
-    },
     "drawerSampleForm.visitId": "syncDrawerCollectionFromVisit",
     "drawerSampleForm.containerId"(next: number | null, prev: number | null) {
       if (next === prev) {
@@ -1139,7 +1080,7 @@ export default defineComponent({
         this.selectedCell &&
         next === this.selectedCell.containerId
       ) {
-        this.drawerSampleForm.aliquots = [
+        this.drawerSampleForm.specimens = [
           {
             barcode: "",
             sampleStatusId: this.getStorageStatusId(),
@@ -1147,22 +1088,22 @@ export default defineComponent({
             positionInContainer: this.selectedCell.label,
           },
         ];
-        this.syncDrawerAliquots();
+        this.syncDrawerSpecimens();
         return;
       }
-      this.drawerSampleForm.aliquots = [];
-      this.syncDrawerAliquots();
+      this.drawerSampleForm.specimens = [];
+      this.syncDrawerSpecimens();
     },
     "drawerSampleForm.initialQuantity"() {
       if (this.sampleDrawerMode === "create") {
         this.drawerSampleForm.currentQuantity =
           this.drawerSampleForm.initialQuantity;
       }
-      this.syncDrawerAliquots();
+      this.syncDrawerSpecimens();
     },
     "drawerSampleForm.barcode"() {
       if (this.sampleDrawerMode === "create" && this.drawerTubeCount > 0) {
-        this.syncDrawerAliquots();
+        this.syncDrawerSpecimens();
       }
     },
   },
@@ -1267,7 +1208,9 @@ export default defineComponent({
       if (!this.drawerContainer) {
         return "Полка не указана";
       }
-      return this.drawerContainer.shelfNumber || "Полка не указана";
+      return this.drawerContainer.shelfNumber != null
+        ? `Полка ${this.drawerContainer.shelfNumber}`
+        : "Полка не указана";
     },
     drawerTubeCount(): number {
       const quantity = Number(this.drawerSampleForm.initialQuantity || 0);
@@ -1332,6 +1275,7 @@ export default defineComponent({
           statusesResponse,
           containersResponse,
           templatesResponse,
+          unitTypesResponse,
           visitsResponse,
           patientsResponse,
           researchesResponse,
@@ -1341,6 +1285,7 @@ export default defineComponent({
           axios.get("/references/sample-statuses"),
           axios.get("/storage/containers"),
           axios.get("/references/container-templates"),
+          axios.get("/references/unit-types"),
           axios.get("/visits"),
           axios.get("/patients"),
           axios.get("/researches"),
@@ -1355,6 +1300,7 @@ export default defineComponent({
           (item) => item.sampleStatusName
         );
         this.containerTemplates = templatesResponse.data || [];
+        this.unitTypes = unitTypesResponse.data || [];
         this.containerRefs = [...containersResponse.data].sort(
           (a: StorageContainer, b: StorageContainer) =>
             this.getContainerLabel(a.containerId).localeCompare(
@@ -1391,11 +1337,14 @@ export default defineComponent({
         return nameA.localeCompare(nameB, "ru-RU");
       });
     },
-    parseShelfNumber(value: string | null): number | null {
-      if (!value) {
+    parseShelfNumber(value: string | number | null): number | null {
+      if (value == null) {
         return null;
       }
-      const match = value.match(/\d+/);
+      if (typeof value === "number") {
+        return value;
+      }
+      const match = String(value).match(/\d+/);
       if (!match) {
         return null;
       }
@@ -1540,7 +1489,7 @@ export default defineComponent({
       const samples = this.getSamplesForContainer(container.containerId);
       const map = new Map<string, Sample>();
       samples.forEach((sample) => {
-        (sample.aliquots || []).forEach((a) => {
+        (sample.specimens || []).forEach((a) => {
           if (
             a.containerId === container.containerId &&
             a.positionInContainer
@@ -1556,16 +1505,16 @@ export default defineComponent({
     },
     getContainerCellMap(container: StorageContainer) {
       const samples = this.getSamplesForContainer(container.containerId);
-      const map = new Map<string, { sample: Sample; aliquot: Aliquot }>();
+      const map = new Map<string, { sample: Sample; specimen: Specimen }>();
       samples.forEach((sample) => {
-        (sample.aliquots || []).forEach((a) => {
+        (sample.specimens || []).forEach((a) => {
           if (
             a.containerId === container.containerId &&
             a.positionInContainer
           ) {
             const label = a.positionInContainer.trim();
             if (label && !map.has(label)) {
-              map.set(label, { sample, aliquot: a });
+              map.set(label, { sample, specimen: a });
             }
           }
         });
@@ -1615,7 +1564,7 @@ export default defineComponent({
         return {
           label,
           filled: cellMap.has(label),
-          sampleBarcode: cellData?.aliquot.barcode ?? cellData?.sample.barcode,
+          sampleBarcode: cellData?.specimen.barcode ?? cellData?.sample.barcode,
           sampleTypeIconUrl: cellData?.sample
             ? this.getSampleTypeIconUrl(cellData.sample.sampleTypeId)
             : undefined,
@@ -1751,7 +1700,7 @@ export default defineComponent({
         (item) => item.containerId === containerId
       );
       if (!container) return "—";
-      const type = container.containerType || "Контейнер";
+      const type = container.templateName || "Контейнер";
       const number = container.containerNumber ?? container.containerId;
       return `${type} ${number}`;
     },
@@ -1815,21 +1764,21 @@ export default defineComponent({
         .filter((item) => Number.isFinite(item));
     },
     getDisplayBarcode(): string {
-      if (this.selectedAliquot?.barcode?.trim()) {
-        return this.selectedAliquot.barcode.trim();
+      if (this.selectedSpecimen?.barcode?.trim()) {
+        return this.selectedSpecimen.barcode.trim();
       }
       return this.selectedSample?.barcode?.trim() || "";
     },
     formatSampleValue(sample: Sample, key: string) {
-      const aliquot = this.selectedAliquot;
-      if (key === "barcode" && aliquot) {
-        return aliquot.barcode?.trim() || "—";
+      const specimen = this.selectedSpecimen;
+      if (key === "barcode" && specimen) {
+        return specimen.barcode?.trim() || "—";
       }
-      if (key === "positionInContainer" && aliquot) {
-        return aliquot.positionInContainer?.trim() || "—";
+      if (key === "positionInContainer" && specimen) {
+        return specimen.positionInContainer?.trim() || "—";
       }
-      if (key === "sampleStatusId" && aliquot) {
-        return this.getSampleStatusName(aliquot.sampleStatusId);
+      if (key === "sampleStatusId" && specimen) {
+        return this.getSampleStatusName(specimen.sampleStatusId);
       }
       if (key === "expiryStatus") {
         return this.getExpiryStatusLabel(this.getSampleExpiryStatus(sample));
@@ -1868,8 +1817,8 @@ export default defineComponent({
         return this.getSampleTypeName(sample.sampleTypeId);
       }
       if (key === "sampleStatusId") {
-        const aliquots = sample.aliquots || [];
-        const labels = aliquots
+        const specimens = sample.specimens || [];
+        const labels = specimens
           .map((a) => this.getSampleStatusName(a.sampleStatusId))
           .filter((l) => l && l !== "—");
         return labels.length > 0 ? labels.join("\n") : "—";
@@ -1886,8 +1835,8 @@ export default defineComponent({
         return this.getContainerLabel(sample.containerId);
       }
       if (key === "positionInContainer") {
-        const aliquots = sample.aliquots || [];
-        const labels = aliquots
+        const specimens = sample.specimens || [];
+        const labels = specimens
           .map((a) => a.positionInContainer)
           .filter((p): p is string => !!p && p.trim() !== "");
         return labels.length > 0 ? labels.join("\n") : "—";
@@ -1915,14 +1864,14 @@ export default defineComponent({
         visit.collectionDate
       );
     },
-    syncDrawerAliquots() {
+    syncDrawerSpecimens() {
       const quantity = this.drawerTubeCount;
       if (quantity <= 0) {
-        this.drawerSampleForm.aliquots = [];
+        this.drawerSampleForm.specimens = [];
         return;
       }
       const baseBarcode = this.drawerSampleForm.barcode || "";
-      const current = [...(this.drawerSampleForm.aliquots || [])];
+      const current = [...(this.drawerSampleForm.specimens || [])];
       const result = [];
       for (let i = 0; i < quantity; i += 1) {
         if (i < current.length) {
@@ -1939,9 +1888,9 @@ export default defineComponent({
           });
         }
       }
-      this.drawerSampleForm.aliquots = result;
+      this.drawerSampleForm.specimens = result;
     },
-    drawerPositionsForAliquot(
+    drawerPositionsForSpecimen(
       containerId: number | null,
       currentIndex: number
     ): Array<{ value: string; disabled: boolean }> {
@@ -1959,12 +1908,12 @@ export default defineComponent({
           s.sampleId === this.selectedSample?.sampleId
         )
           return;
-        (s.aliquots || []).forEach((a) => {
+        (s.specimens || []).forEach((a) => {
           if (a.containerId === containerId && a.positionInContainer)
             occupied.add(a.positionInContainer);
         });
       });
-      (this.drawerSampleForm.aliquots || []).forEach((a, idx) => {
+      (this.drawerSampleForm.specimens || []).forEach((a, idx) => {
         if (
           idx !== currentIndex &&
           a.containerId === containerId &&
@@ -2005,7 +1954,7 @@ export default defineComponent({
       const samples = this.getSamplesForContainer(container.containerId);
       return (
         samples.find((sample) =>
-          (sample.aliquots || []).some(
+          (sample.specimens || []).some(
             (a) =>
               a.containerId === container.containerId &&
               a.positionInContainer?.trim() === label
@@ -2013,18 +1962,18 @@ export default defineComponent({
         ) || null
       );
     },
-    findAliquotForCell(
+    findSpecimenForCell(
       container: StorageContainer,
       label: string
-    ): Aliquot | null {
+    ): Specimen | null {
       const samples = this.getSamplesForContainer(container.containerId);
       for (const sample of samples) {
-        const aliquot = (sample.aliquots || []).find(
+        const specimen = (sample.specimens || []).find(
           (a) =>
             a.containerId === container.containerId &&
             a.positionInContainer?.trim() === label
         );
-        if (aliquot) return aliquot;
+        if (specimen) return specimen;
       }
       return null;
     },
@@ -2040,8 +1989,8 @@ export default defineComponent({
       const container = this.containerRefs.find(
         (c) => c.containerId === containerId
       );
-      this.selectedAliquot =
-        container && sample ? this.findAliquotForCell(container, label) : null;
+      this.selectedSpecimen =
+        container && sample ? this.findSpecimenForCell(container, label) : null;
       if (!sample) {
         this.errorMessage = "Образец для позиции не найден.";
       }
@@ -2051,7 +2000,7 @@ export default defineComponent({
       this.sampleDrawerMode = "create";
       this.selectedCell = { containerId, label };
       this.selectedSample = null;
-      this.selectedAliquot = null;
+      this.selectedSpecimen = null;
       const storageStatusId = this.getStorageStatusId();
       this.drawerSampleForm = {
         visitId: null,
@@ -2064,7 +2013,7 @@ export default defineComponent({
         expiryStatus: "",
         containerId: containerId,
         collectionDate: "",
-        aliquots: [
+        specimens: [
           {
             barcode: "",
             sampleStatusId: storageStatusId,
@@ -2073,7 +2022,7 @@ export default defineComponent({
           },
         ],
       };
-      this.syncDrawerAliquots();
+      this.syncDrawerSpecimens();
     },
     openSampleEdit() {
       if (!this.selectedSample) {
@@ -2081,7 +2030,7 @@ export default defineComponent({
       }
       this.drawerFormInitializing = true;
       this.sampleDrawerMode = "edit";
-      const aliquots = this.selectedSample.aliquots || [];
+      const specimens = this.selectedSample.specimens || [];
       this.drawerSampleForm = {
         visitId: this.selectedSample.visitId,
         barcode: this.selectedSample.barcode,
@@ -2095,9 +2044,9 @@ export default defineComponent({
         collectionDate: this.toDatetimeLocal(
           this.selectedSample.createdAtSample
         ),
-        aliquots:
-          aliquots.length > 0
-            ? aliquots.map((a) => ({
+        specimens:
+          specimens.length > 0
+            ? specimens.map((a) => ({
                 barcode: a.barcode,
                 sampleStatusId: a.sampleStatusId,
                 containerId: a.containerId,
@@ -2105,7 +2054,7 @@ export default defineComponent({
               }))
             : [],
       };
-      this.syncDrawerAliquots();
+      this.syncDrawerSpecimens();
       this.$nextTick(() => {
         this.drawerFormInitializing = false;
       });
@@ -2115,7 +2064,7 @@ export default defineComponent({
       this.sampleDrawerMode = null;
       this.selectedCell = null;
       this.selectedSample = null;
-      this.selectedAliquot = null;
+      this.selectedSpecimen = null;
     },
     async submitSampleDrawer() {
       this.errorMessage = "";
@@ -2140,22 +2089,22 @@ export default defineComponent({
         this.errorMessage = "Заполните обязательные поля.";
         return;
       }
-      const aliquots = this.drawerSampleForm.aliquots || [];
-      if (quantity > 0 && aliquots.length !== quantity) {
+      const specimens = this.drawerSampleForm.specimens || [];
+      if (quantity > 0 && specimens.length !== quantity) {
         this.errorMessage =
           "Количество аликвот должно совпадать с начальным количеством.";
         return;
       }
       if (quantity > 0) {
-        const emptyBarcodes = aliquots.filter(
+        const emptyBarcodes = specimens.filter(
           (a) => !a.barcode || !a.barcode.trim()
         );
         if (emptyBarcodes.length > 0) {
           this.errorMessage = "Укажите штрихкод для каждой аликвоты.";
           return;
         }
-        const barcodeSet = new Set(aliquots.map((a) => a.barcode.trim()));
-        if (barcodeSet.size !== aliquots.length) {
+        const barcodeSet = new Set(specimens.map((a) => a.barcode.trim()));
+        if (barcodeSet.size !== specimens.length) {
           this.errorMessage = "Штрихкоды аликвот не должны повторяться.";
           return;
         }
@@ -2167,14 +2116,14 @@ export default defineComponent({
       const refreshed =
         this.samples.find((sample) => sample.sampleId === created.sampleId) ||
         created;
-      const firstAliquot = this.drawerSampleForm.aliquots?.[0];
+      const firstSpecimen = this.drawerSampleForm.specimens?.[0];
       const containerId =
-        firstAliquot?.containerId ??
+        firstSpecimen?.containerId ??
         this.drawerSampleForm.containerId ??
         this.selectedCell?.containerId ??
         0;
       const label =
-        firstAliquot?.positionInContainer || this.selectedCell?.label || "";
+        firstSpecimen?.positionInContainer || this.selectedCell?.label || "";
       this.openSampleDetails(containerId, label, refreshed);
     },
     async updateSampleInDrawer() {
@@ -2186,22 +2135,22 @@ export default defineComponent({
         this.errorMessage = "Заполните обязательные поля.";
         return;
       }
-      const aliquots = this.drawerSampleForm.aliquots || [];
-      if (quantity > 0 && aliquots.length !== quantity) {
+      const specimens = this.drawerSampleForm.specimens || [];
+      if (quantity > 0 && specimens.length !== quantity) {
         this.errorMessage =
           "Количество аликвот должно совпадать с начальным количеством.";
         return;
       }
       if (quantity > 0) {
-        const emptyBarcodes = aliquots.filter(
+        const emptyBarcodes = specimens.filter(
           (a) => !a.barcode || !a.barcode.trim()
         );
         if (emptyBarcodes.length > 0) {
           this.errorMessage = "Укажите штрихкод для каждой аликвоты.";
           return;
         }
-        const barcodeSet = new Set(aliquots.map((a) => a.barcode.trim()));
-        if (barcodeSet.size !== aliquots.length) {
+        const barcodeSet = new Set(specimens.map((a) => a.barcode.trim()));
+        if (barcodeSet.size !== specimens.length) {
           this.errorMessage = "Штрихкоды аликвот не должны повторяться.";
           return;
         }
@@ -2216,16 +2165,16 @@ export default defineComponent({
         this.samples.find(
           (sample) => sample.sampleId === this.selectedSample?.sampleId
         ) || null;
-      const firstAliquot = this.drawerSampleForm.aliquots?.[0];
+      const firstSpecimen = this.drawerSampleForm.specimens?.[0];
       const containerId =
         this.drawerSampleForm.containerId ??
         this.selectedCell?.containerId ??
-        firstAliquot?.containerId ??
+        firstSpecimen?.containerId ??
         null;
-      if (refreshed && containerId && firstAliquot?.positionInContainer) {
+      if (refreshed && containerId && firstSpecimen?.positionInContainer) {
         this.openSampleDetails(
           containerId,
-          firstAliquot.positionInContainer,
+          firstSpecimen.positionInContainer,
           refreshed
         );
       }
@@ -2235,7 +2184,7 @@ export default defineComponent({
         this.drawerSampleForm.containerId ??
         this.selectedCell?.containerId ??
         null;
-      const aliquots = (this.drawerSampleForm.aliquots || []).map((a) => ({
+      const specimens = (this.drawerSampleForm.specimens || []).map((a) => ({
         barcode: a.barcode.trim(),
         sampleStatusId: a.sampleStatusId,
         containerId: sampleContainerId,
@@ -2256,7 +2205,7 @@ export default defineComponent({
         ),
         containerId: this.toNullableNumber(this.drawerSampleForm.containerId),
         collectionDate: this.drawerSampleForm.collectionDate || null,
-        aliquots,
+        specimens,
       };
     },
     async deleteSampleInDrawer() {
@@ -2279,13 +2228,6 @@ export default defineComponent({
         );
       }
     },
-    syncContainerCapacity() {
-      const rows = this.modalContainer.rowsCount;
-      const columns = this.modalContainer.columnsCount;
-      if (rows && columns) {
-        this.modalContainer.maxSamplesCount = rows * columns;
-      }
-    },
     numberingTypeLabel(type: string | null): string {
       if (!type) return "—";
       const map: Record<string, string> = {
@@ -2296,24 +2238,10 @@ export default defineComponent({
       };
       return map[type] || type;
     },
-    onContainerTemplateSelect() {
-      const templateId = this.selectedContainerTemplateId;
-      if (!templateId) return;
-      const t = this.containerTemplates.find(
-        (x) => String(x.templateId) === String(templateId)
-      );
-      if (!t) return;
-      this.modalContainer.containerType = t.templateName;
-      this.modalContainer.rowsCount = t.rowsCount;
-      this.modalContainer.columnsCount = t.columnsCount;
-      this.modalContainer.maxSamplesCount = t.rowsCount * t.columnsCount;
-      this.modalContainer.numberingType = t.numberingType;
-      this.syncContainerCapacity();
-    },
     getSamplesForContainer(containerId: number): Sample[] {
       return this.samples.filter((sample) => {
         if (sample.containerId === containerId) return true;
-        return (sample.aliquots || []).some(
+        return (sample.specimens || []).some(
           (a) => a.containerId === containerId
         );
       });
@@ -2328,9 +2256,11 @@ export default defineComponent({
           return parsed === shelfIndex;
         })
         .sort((a, b) => {
-          const aNum = a.containerNumber ?? 0;
-          const bNum = b.containerNumber ?? 0;
-          return aNum - bNum;
+          const aVal = a.containerNumber ?? "";
+          const bVal = b.containerNumber ?? "";
+          return String(aVal).localeCompare(String(bVal), undefined, {
+            numeric: true,
+          });
         });
     },
     ensureSelections() {
@@ -2466,11 +2396,11 @@ export default defineComponent({
         shelfIndexValue: number
       ) => {
         list.forEach((container, index) => {
-          const nextShelf = `Полка ${shelfIndexValue}`;
-          const nextNumber = index + 1;
+          const nextShelf = shelfIndexValue;
+          const nextNumber = String(index + 1);
           if (
             container.shelfNumber !== nextShelf ||
-            container.containerNumber !== nextNumber
+            (container.containerNumber ?? "") !== nextNumber
           ) {
             container.shelfNumber = nextShelf;
             container.containerNumber = nextNumber;
@@ -2490,14 +2420,9 @@ export default defineComponent({
     async persistContainerUpdates(containers: StorageContainer[]) {
       for (const container of containers) {
         await axios.put(`/storage/containers/${container.containerId}`, {
+          templateId: container.templateId,
+          containerNumber: container.containerNumber || null,
           shelfNumber: container.shelfNumber,
-          containerType: container.containerType,
-          containerNumber: container.containerNumber,
-          rowsCount: container.rowsCount,
-          columnsCount: container.columnsCount,
-          maxSamplesCount: container.maxSamplesCount,
-          currentSamplesCount: container.currentSamplesCount,
-          numberingType: container.numberingType,
         });
       }
     },
@@ -2522,7 +2447,7 @@ export default defineComponent({
       this.modalMode = "create";
       this.modalTitle = "Добавить хранилище";
       this.modalUnit = {
-        unitType: "",
+        unitTypeId: null,
         unitName: "",
         shelvesCount: null,
       };
@@ -2533,24 +2458,15 @@ export default defineComponent({
         this.errorMessage = "Сначала выберите хранилище";
         return;
       }
-      const shelfLabel = this.selectedShelfIndex
-        ? `Полка ${this.selectedShelfIndex}`
-        : "";
+      const shelfNum = this.selectedShelfIndex ?? null;
       this.modalType = "container";
       this.modalMode = "create";
       this.modalTitle = "Добавить контейнер";
-      this.selectedContainerTemplateId = "";
       this.modalContainer = {
-        shelfNumber: shelfLabel,
-        containerType: "",
-        containerNumber: null,
-        rowsCount: null,
-        columnsCount: null,
-        maxSamplesCount: null,
-        currentSamplesCount: null,
-        numberingType: null,
+        templateId: null,
+        containerNumber: "",
+        shelfNumber: shelfNum,
       };
-      this.syncContainerCapacity();
       this.modalOpen = true;
     },
     closeModal() {
@@ -2602,7 +2518,11 @@ export default defineComponent({
         this.errorMessage = "Сначала выберите локацию";
         return;
       }
-      const payload = this.modalUnit;
+      const payload = {
+        unitTypeId: this.modalUnit.unitTypeId,
+        unitName: this.modalUnit.unitName,
+        shelvesCount: this.modalUnit.shelvesCount,
+      };
       try {
         await axios.post(`/storage/locations/${locationId}/units`, payload);
         this.successMessage = "Хранилище успешно добавлено";
@@ -2625,7 +2545,11 @@ export default defineComponent({
         this.errorMessage = "Сначала выберите хранилище";
         return;
       }
-      const payload = this.modalContainer;
+      const payload = {
+        templateId: this.modalContainer.templateId,
+        containerNumber: this.modalContainer.containerNumber || null,
+        shelfNumber: this.modalContainer.shelfNumber,
+      };
       try {
         await axios.post(`/storage/units/${unitId}/containers`, payload);
         this.successMessage = "Контейнер успешно добавлен";
@@ -2665,7 +2589,7 @@ export default defineComponent({
       this.modalMode = "edit";
       this.modalTitle = "Обновить хранилище";
       this.modalUnit = {
-        unitType: this.selectedUnit.unitType,
+        unitTypeId: this.selectedUnit.unitTypeId,
         unitName: this.selectedUnit.unitName,
         shelvesCount: this.selectedUnit.shelvesCount,
       };
@@ -2679,18 +2603,12 @@ export default defineComponent({
       this.modalType = "container";
       this.modalMode = "edit";
       this.modalTitle = "Обновить контейнер";
-      this.selectedContainerTemplateId = "";
       this.modalContainer = {
-        shelfNumber: this.selectedContainer.shelfNumber || "",
-        containerType: this.selectedContainer.containerType || "",
-        containerNumber: this.selectedContainer.containerNumber,
-        rowsCount: this.selectedContainer.rowsCount,
-        columnsCount: this.selectedContainer.columnsCount,
-        maxSamplesCount: this.selectedContainer.maxSamplesCount,
+        templateId: this.selectedContainer.templateId,
+        containerNumber: this.selectedContainer.containerNumber ?? "",
+        shelfNumber: this.selectedContainer.shelfNumber,
         currentSamplesCount: this.selectedContainer.currentSamplesCount,
-        numberingType: this.selectedContainer.numberingType,
       };
-      this.syncContainerCapacity();
       this.modalOpen = true;
     },
     async updateLocation() {
@@ -2721,10 +2639,11 @@ export default defineComponent({
       this.successMessage = "";
       this.errorMessage = "";
       try {
-        await axios.put(
-          `/storage/units/${this.selectedUnitId}`,
-          this.modalUnit
-        );
+        await axios.put(`/storage/units/${this.selectedUnitId}`, {
+          unitTypeId: this.modalUnit.unitTypeId,
+          unitName: this.modalUnit.unitName,
+          shelvesCount: this.modalUnit.shelvesCount,
+        });
         this.successMessage = "Хранилище обновлено";
         this.closeModal();
         await this.fetchLocations();
@@ -2742,10 +2661,11 @@ export default defineComponent({
       this.successMessage = "";
       this.errorMessage = "";
       try {
-        await axios.put(
-          `/storage/containers/${this.selectedContainerId}`,
-          this.modalContainer
-        );
+        await axios.put(`/storage/containers/${this.selectedContainerId}`, {
+          templateId: this.modalContainer.templateId,
+          containerNumber: this.modalContainer.containerNumber || null,
+          shelfNumber: this.modalContainer.shelfNumber,
+        });
         this.successMessage = "Контейнер обновлен";
         this.closeModal();
         await this.fetchLocations();
@@ -2760,9 +2680,11 @@ export default defineComponent({
       if (!this.selectedLocation || !this.selectedUnit) {
         return "";
       }
-      const containerName = container.containerType || "Контейнер";
+      const containerName = container.templateName || "Контейнер";
       const number = container.containerNumber ?? "—";
-      return `${this.selectedLocation.locationName} → ${this.selectedUnit.unitName} → ${shelfLabel} → ${containerName} №${number}`;
+      return `${this.selectedLocation.locationName} → ${
+        this.selectedUnit.unitName
+      } → ${shelfLabel} → ${containerName} ${number ? `№${number}` : ""}`;
     },
     async deleteLocation() {
       if (!this.selectedLocationId) {

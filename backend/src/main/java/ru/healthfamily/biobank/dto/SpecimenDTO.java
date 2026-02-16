@@ -7,8 +7,8 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class AliquotDTO {
-    private Long aliquotId;
+public class SpecimenDTO {
+    private Long specimenId;
     private String barcode;
     private Long sampleId;
     private Long sampleStatusId;

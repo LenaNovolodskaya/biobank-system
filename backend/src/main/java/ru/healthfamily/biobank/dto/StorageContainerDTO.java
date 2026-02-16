@@ -9,12 +9,14 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class StorageContainerDTO {
     private Long containerId;
-    private String shelfNumber;
-    private String containerType;
-    private Integer containerNumber;
+    private String containerNumber;
+    private Integer currentSamplesCount;
+    private Long unitId;
+    private Integer shelfNumber;
+    private Long templateId;
+    private String templateName;
     private Integer rowsCount;
     private Integer columnsCount;
     private Integer maxSamplesCount;
-    private Integer currentSamplesCount;
     private String numberingType;
 }

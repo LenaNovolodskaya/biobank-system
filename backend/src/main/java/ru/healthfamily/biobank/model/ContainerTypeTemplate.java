@@ -33,9 +33,9 @@ public class ContainerTypeTemplate {
     @Column(name = "columns_count", nullable = false)
     private Integer columnsCount;
 
+    @Column(name = "max_samples_count", nullable = false)
+    private Integer maxSamplesCount;
+
     @Column(name = "numbering_type", nullable = false, length = 20)
     private String numberingType; // LETTER_DIGIT, DIGIT_LETTER, DIGIT_DIGIT, SEQUENTIAL
-
-    @Column(name = "display_order")
-    private Integer displayOrder;
 }

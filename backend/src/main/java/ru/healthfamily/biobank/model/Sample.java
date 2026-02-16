@@ -46,7 +46,7 @@ public class Sample {
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "expiry_status", columnDefinition = "expirystatus")
+    @Column(name = "expiry_status", columnDefinition = "expiry_status_type")
     private ExpiryStatus expiryStatus = ExpiryStatus.GREEN;
 
     @Column(name = "container_id")
@@ -56,7 +56,7 @@ public class Sample {
     private LocalDateTime createdAtSample;
 
     @OneToMany(mappedBy = "sample", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<Aliquot> aliquots = new ArrayList<>();
+    private List<Specimen> specimens = new ArrayList<>();
 
     public enum ExpiryStatus {
         GREEN, YELLOW, RED

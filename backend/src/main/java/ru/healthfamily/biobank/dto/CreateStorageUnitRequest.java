@@ -1,15 +1,15 @@
 package ru.healthfamily.biobank.dto;
 
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
 public class CreateStorageUnitRequest {
 
-    @NotBlank(message = "Тип хранилища обязателен")
-    private String unitType;
+    @NotNull(message = "Тип хранилища обязателен")
+    private Long unitTypeId;
 
-    @NotBlank(message = "Название хранилища обязательно")
+    @NotNull(message = "Название хранилища обязательно")
     private String unitName;
 
     private Integer shelvesCount;

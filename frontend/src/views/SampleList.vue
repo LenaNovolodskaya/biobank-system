@@ -262,9 +262,6 @@
 
     <div class="card table-card">
       <p v-if="loading">Загрузка...</p>
-      <div v-else-if="filteredSamples.length === 0" class="empty-state">
-        Нет образцов по заданным условиям
-      </div>
       <div v-else class="table-wrapper" @click="activeHeaderHelp = null">
         <table class="samples-table">
           <thead>
@@ -294,6 +291,11 @@
             </tr>
           </thead>
           <tbody>
+            <tr v-if="filteredSamples.length === 0" class="empty-row">
+              <td :colspan="visibleColumns.length + 2" class="empty-state">
+                Нет образцов по заданным условиям
+              </td>
+            </tr>
             <template v-for="sample in filteredSamples" :key="sample.sampleId">
               <tr
                 :class="{ selected: sample.sampleId === selectedSampleId }"
@@ -365,17 +367,17 @@
               </tr>
               <tr
                 v-if="sample.sampleId === selectedSampleId"
-                class="aliquots-details-row"
+                class="specimens-details-row"
               >
-                <td :colspan="visibleColumns.length + 2" class="aliquots-cell">
-                  <div class="aliquots-header">Аликвоты:</div>
+                <td :colspan="visibleColumns.length + 2" class="specimens-cell">
+                  <div class="specimens-header">Образцы:</div>
                   <div
-                    v-if="getSampleAliquots(sample).length === 0"
-                    class="aliquots-empty"
+                    v-if="getSampleSpecimens(sample).length === 0"
+                    class="specimens-empty"
                   >
                     Нет аликвот
                   </div>
-                  <table v-else class="aliquots-table">
+                  <table v-else class="specimens-table">
                     <thead>
                       <tr>
                         <th>Штрихкод</th>
@@ -385,21 +387,21 @@
                     </thead>
                     <tbody>
                       <tr
-                        v-for="aliquot in getSampleAliquots(sample)"
-                        :key="aliquot.aliquotId"
-                        class="aliquot-row"
+                        v-for="specimen in getSampleSpecimens(sample)"
+                        :key="specimen.specimenId"
+                        class="specimen-row"
                       >
-                        <td class="aliquot-barcode-cell">
-                          <BarcodeSvg :value="aliquot.barcode" />
-                          <span class="aliquot-barcode">{{
-                            aliquot.barcode
+                        <td class="specimen-barcode-cell">
+                          <BarcodeSvg :value="specimen.barcode" />
+                          <span class="specimen-barcode">{{
+                            specimen.barcode
                           }}</span>
                         </td>
-                        <td class="aliquot-status">
-                          {{ getSampleStatusName(aliquot.sampleStatusId) }}
+                        <td class="specimen-status">
+                          {{ getSampleStatusName(specimen.sampleStatusId) }}
                         </td>
-                        <td class="aliquot-position">
-                          {{ aliquot.positionInContainer || "—" }}
+                        <td class="specimen-position">
+                          {{ specimen.positionInContainer || "—" }}
                         </td>
                       </tr>
                     </tbody>
@@ -528,23 +530,23 @@
               </option>
             </select>
           </div>
-          <div class="form-group aliquots-form-group">
-            <label>Аликвоты</label>
-            <div v-if="tubeCount > 0" class="aliquots-form-grid">
+          <div class="form-group specimens-form-group">
+            <label>Образцы</label>
+            <div v-if="tubeCount > 0" class="specimens-form-grid">
               <div
-                v-for="(aliquot, index) in modalSample.aliquots"
+                v-for="(specimen, index) in modalSample.specimens"
                 :key="index"
-                class="aliquot-form-row"
+                class="specimen-form-row"
               >
-                <div class="aliquot-form-label">Аликвота {{ index + 1 }}</div>
+                <div class="specimen-form-label">Образец {{ index + 1 }}</div>
                 <input
-                  v-model="aliquot.barcode"
+                  v-model="specimen.barcode"
                   type="text"
                   class="form-control"
-                  placeholder="Штрихкод аликвоты"
+                  placeholder="Штрихкод образца"
                 />
                 <select
-                  v-model.number="aliquot.sampleStatusId"
+                  v-model.number="specimen.sampleStatusId"
                   class="form-control"
                 >
                   <option :value="null">Не указано</option>
@@ -557,13 +559,13 @@
                   </option>
                 </select>
                 <select
-                  v-model="aliquot.positionInContainer"
+                  v-model="specimen.positionInContainer"
                   class="form-control"
                   :disabled="!modalSample.containerId"
                 >
                   <option value="">Не указано</option>
                   <option
-                    v-for="pos in positionsForAliquotContainer(
+                    v-for="pos in positionsForSpecimenContainer(
                       modalSample.containerId,
                       index
                     )"
@@ -596,8 +598,8 @@ import { defineComponent } from "vue";
 import axios from "axios";
 import BarcodeSvg from "@/components/BarcodeSvg.vue";
 
-interface Aliquot {
-  aliquotId: number;
+interface Specimen {
+  specimenId: number;
   barcode: string;
   sampleId: number;
   sampleStatusId: number | null;
@@ -617,7 +619,7 @@ interface Sample {
   expiryStatus: string;
   containerId: number | null;
   createdAtSample: string;
-  aliquots?: Aliquot[];
+  specimens?: Specimen[];
 }
 
 interface ColumnConfig {
@@ -627,7 +629,7 @@ interface ColumnConfig {
   visible: boolean;
 }
 
-interface AliquotFormItem {
+interface SpecimenFormItem {
   barcode: string;
   sampleStatusId: number | null;
   containerId: number | null;
@@ -645,7 +647,7 @@ interface SampleForm {
   expiryStatus: string;
   containerId: number | null;
   collectionDate: string;
-  aliquots: AliquotFormItem[];
+  specimens: SpecimenFormItem[];
 }
 
 interface VisitRef {
@@ -773,7 +775,7 @@ export default defineComponent({
         expiryStatus: "",
         containerId: null,
         collectionDate: "",
-        aliquots: [],
+        specimens: [],
       } as SampleForm,
       visits: [] as VisitRef[],
       patients: [] as PatientRef[],
@@ -987,15 +989,15 @@ export default defineComponent({
       if (this.modalMode === "create") {
         this.modalSample.currentQuantity = this.modalSample.initialQuantity;
       }
-      this.syncAliquots();
+      this.syncSpecimens();
     },
     "modalSample.barcode"() {
       if (this.modalMode === "create" && this.tubeCount > 0) {
-        this.syncAliquots();
+        this.syncSpecimens();
       }
     },
     "modalSample.containerId"() {
-      this.syncAliquots();
+      this.syncSpecimens();
     },
   },
   methods: {
@@ -1148,16 +1150,16 @@ export default defineComponent({
       const lastDay = new Date(targetYear, targetMonth + 1, 0).getDate();
       return new Date(targetYear, targetMonth, Math.min(day, lastDay));
     },
-    syncAliquots() {
+    syncSpecimens() {
       const quantity = this.tubeCount;
-      const current = this.modalSample.aliquots;
+      const current = this.modalSample.specimens;
       if (quantity <= 0) {
-        this.modalSample.aliquots = [];
+        this.modalSample.specimens = [];
         return;
       }
       const baseBarcode = this.modalSample.barcode || "";
       const existing = [...current];
-      const result: AliquotFormItem[] = [];
+      const result: SpecimenFormItem[] = [];
       for (let i = 0; i < quantity; i += 1) {
         if (i < existing.length) {
           result.push(existing[i]);
@@ -1170,12 +1172,12 @@ export default defineComponent({
           });
         }
       }
-      this.modalSample.aliquots = result;
+      this.modalSample.specimens = result;
     },
-    getSampleAliquots(sample: Sample): Aliquot[] {
-      return sample.aliquots || [];
+    getSampleSpecimens(sample: Sample): Specimen[] {
+      return sample.specimens || [];
     },
-    positionsForAliquotContainer(
+    positionsForSpecimenContainer(
       containerId: number | null,
       currentIndex: number
     ): Array<{ value: string; disabled: boolean }> {
@@ -1190,12 +1192,12 @@ export default defineComponent({
       this.samples.forEach((s: Sample) => {
         if (this.modalMode === "edit" && s.sampleId === this.selectedSampleId)
           return;
-        (s.aliquots || []).forEach((a: Aliquot) => {
+        (s.specimens || []).forEach((a: Specimen) => {
           if (a.containerId === containerId && a.positionInContainer)
             occupied.add(a.positionInContainer);
         });
       });
-      this.modalSample.aliquots.forEach((a, idx) => {
+      this.modalSample.specimens.forEach((a, idx) => {
         if (
           idx !== currentIndex &&
           a.containerId === containerId &&
@@ -1256,9 +1258,9 @@ export default defineComponent({
         expiryStatus: "",
         containerId: null,
         collectionDate: "",
-        aliquots: [],
+        specimens: [],
       };
-      this.syncAliquots();
+      this.syncSpecimens();
       this.modalOpen = true;
     },
     openEditModal() {
@@ -1273,7 +1275,7 @@ export default defineComponent({
       this.modalSampleInitializing = true;
       this.modalMode = "edit";
       this.modalTitle = "Обновить образец";
-      const aliquots = sample.aliquots || [];
+      const specimens = sample.specimens || [];
       this.modalSample = {
         visitId: sample.visitId,
         barcode: sample.barcode,
@@ -1285,9 +1287,9 @@ export default defineComponent({
         expiryStatus: sample.expiryStatus || "",
         containerId: sample.containerId,
         collectionDate: this.toDatetimeLocal(sample.createdAtSample),
-        aliquots:
-          aliquots.length > 0
-            ? aliquots.map((a) => ({
+        specimens:
+          specimens.length > 0
+            ? specimens.map((a) => ({
                 barcode: a.barcode,
                 sampleStatusId: a.sampleStatusId,
                 containerId: a.containerId,
@@ -1295,7 +1297,7 @@ export default defineComponent({
               }))
             : [],
       };
-      this.syncAliquots();
+      this.syncSpecimens();
       this.$nextTick(() => {
         this.modalSampleInitializing = false;
       });
@@ -1308,22 +1310,22 @@ export default defineComponent({
       this.errorMessage = "";
       this.successMessage = "";
       const quantity = Number(this.modalSample.initialQuantity || 0);
-      const aliquots = this.modalSample.aliquots || [];
-      if (quantity > 0 && aliquots.length !== quantity) {
+      const specimens = this.modalSample.specimens || [];
+      if (quantity > 0 && specimens.length !== quantity) {
         this.errorMessage =
           "Количество аликвот должно совпадать с начальным количеством.";
         return;
       }
       if (quantity > 0) {
-        const emptyBarcodes = aliquots.filter(
+        const emptyBarcodes = specimens.filter(
           (a) => !a.barcode || !a.barcode.trim()
         );
         if (emptyBarcodes.length > 0) {
           this.errorMessage = "Укажите штрихкод для каждой аликвоты.";
           return;
         }
-        const barcodeSet = new Set(aliquots.map((a) => a.barcode.trim()));
-        if (barcodeSet.size !== aliquots.length) {
+        const barcodeSet = new Set(specimens.map((a) => a.barcode.trim()));
+        if (barcodeSet.size !== specimens.length) {
           this.errorMessage = "Штрихкоды аликвот не должны повторяться.";
           return;
         }
@@ -1391,7 +1393,7 @@ export default defineComponent({
     },
     serializeSampleForm() {
       const sampleContainerId = this.modalSample.containerId ?? null;
-      const aliquots = (this.modalSample.aliquots || []).map((a) => ({
+      const specimens = (this.modalSample.specimens || []).map((a) => ({
         barcode: a.barcode.trim(),
         sampleStatusId: a.sampleStatusId,
         containerId: sampleContainerId,
@@ -1412,7 +1414,7 @@ export default defineComponent({
         ),
         containerId: this.toNullableNumber(this.modalSample.containerId),
         collectionDate: this.modalSample.collectionDate || null,
-        aliquots,
+        specimens,
       };
     },
     toNullableNumber(value: number | null) {
@@ -1889,29 +1891,29 @@ h2 {
   font-weight: 600;
 }
 
-.aliquots-details-row {
+.specimens-details-row {
   background-color: #f0e9df;
 }
 
-.aliquots-cell {
+.specimens-cell {
   padding: 12px 16px !important;
   vertical-align: top;
 }
 
-.aliquots-header {
+.specimens-header {
   font-weight: 600;
   color: var(--text-primary);
   margin-bottom: 8px;
 }
 
-.aliquots-table {
+.specimens-table {
   border-collapse: collapse;
   width: max-content;
   margin-top: 8px;
 }
 
-.aliquots-table thead th,
-.aliquots-table tbody td {
+.specimens-table thead th,
+.specimens-table tbody td {
   padding: 8px 12px;
   text-align: left;
   border-bottom: 1px solid var(--border);
@@ -1919,68 +1921,68 @@ h2 {
   word-break: break-word;
 }
 
-.aliquots-table thead th {
+.specimens-table thead th {
   background-color: #f0e9df;
   color: var(--text-primary);
   border-bottom: 2px solid var(--border);
   font-weight: 600;
 }
 
-.aliquots-table thead th:nth-child(1),
-.aliquots-table tbody td:nth-child(1) {
+.specimens-table thead th:nth-child(1),
+.specimens-table tbody td:nth-child(1) {
   min-width: 160px;
 }
 
-.aliquots-table thead th:nth-child(2),
-.aliquots-table tbody td:nth-child(2) {
+.specimens-table thead th:nth-child(2),
+.specimens-table tbody td:nth-child(2) {
   min-width: 110px;
 }
 
-.aliquots-table thead th:nth-child(3),
-.aliquots-table tbody td:nth-child(3) {
+.specimens-table thead th:nth-child(3),
+.specimens-table tbody td:nth-child(3) {
   min-width: 90px;
 }
 
-.aliquot-barcode-cell {
+.specimen-barcode-cell {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.aliquot-barcode-cell :deep(.barcode-svg) {
+.specimen-barcode-cell :deep(.barcode-svg) {
   max-width: 140px;
 }
 
-.aliquot-barcode {
+.specimen-barcode {
   font-weight: 500;
   color: var(--text-primary);
 }
 
-.aliquot-status,
-.aliquot-position {
+.specimen-status,
+.specimen-position {
   color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
-.aliquots-empty {
+.specimens-empty {
   color: var(--text-secondary);
   font-style: italic;
   padding: 8px 0;
 }
 
-.aliquots-form-grid {
+.specimens-form-grid {
   display: grid;
   gap: 12px;
 }
 
-.aliquot-form-row {
+.specimen-form-row {
   display: grid;
   grid-template-columns: 100px 1fr 140px 120px;
   gap: 8px;
   align-items: center;
 }
 
-.aliquot-form-label {
+.specimen-form-label {
   color: var(--text-secondary);
   font-weight: 600;
   font-size: 0.9rem;
