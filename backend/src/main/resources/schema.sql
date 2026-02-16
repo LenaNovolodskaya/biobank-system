@@ -229,10 +229,10 @@ CREATE TABLE IF NOT EXISTS storage_units (
 );
 //
 
--- Шаблоны типов контейнеров
+-- Шаблоны типов контейнеров (название может повторяться при разных размерах/типе нумерации)
 CREATE TABLE IF NOT EXISTS container_type_templates (
     template_id SERIAL PRIMARY KEY,
-    template_name VARCHAR(255) UNIQUE NOT NULL,
+    template_name VARCHAR(255) NOT NULL,
     rows_count INT NOT NULL CHECK (rows_count > 0),
     columns_count INT NOT NULL CHECK (columns_count > 0),
     max_samples_count INT NOT NULL CHECK (max_samples_count > 0),

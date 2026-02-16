@@ -39,14 +39,16 @@ INSERT INTO sample_types (sample_type_name, icon_path) VALUES
 ON CONFLICT (sample_type_name) DO NOTHING
 //
 -- Шаблоны контейнеров (без display_order, по id)
-INSERT INTO container_type_templates (template_name, rows_count, columns_count, max_samples_count, numbering_type) VALUES
-    ('Криобокс для низких температур (10х10)', 10, 10, 100, 'LETTER_DIGIT'),
-    ('Криобокс для низких температур (9х9)', 9, 9, 81, 'LETTER_DIGIT'),
-    ('Штатив для микропробирок 1.5-2 мл (10х5)', 10, 5, 50, 'SEQUENTIAL'),
-    ('Штатив для микропробирок 1.5-2 мл (8х12)', 8, 12, 96, 'SEQUENTIAL'),
-    ('Штатив/кассета для пробирок 5-15 мл (5х5)', 5, 5, 25, 'SEQUENTIAL'),
-    ('Транспортная стойка для анализаторов (8х5)', 8, 5, 40, 'SEQUENTIAL')
-ON CONFLICT (template_name) DO NOTHING
+INSERT INTO container_type_templates (template_name, rows_count, columns_count, max_samples_count, numbering_type)
+SELECT v.* FROM (VALUES
+    ('Криобокс для низких температур', 10, 10, 100, 'LETTER_DIGIT'),
+    ('Криобокс для низких температур', 9, 9, 81, 'LETTER_DIGIT'),
+    ('Штатив для микропробирок 1.5-2 мл', 10, 5, 50, 'SEQUENTIAL'),
+    ('Штатив для микропробирок 1.5-2 мл', 8, 12, 96, 'SEQUENTIAL'),
+    ('Штатив/кассета для пробирок 5-15 мл', 5, 5, 25, 'SEQUENTIAL'),
+    ('Транспортная стойка для анализаторов', 8, 5, 40, 'SEQUENTIAL')
+) AS v(template_name, rows_count, columns_count, max_samples_count, numbering_type)
+WHERE (SELECT COUNT(*) FROM container_type_templates) = 0
 //
 -- Типы хранилища
 INSERT INTO unit_types (unit_type_name) VALUES

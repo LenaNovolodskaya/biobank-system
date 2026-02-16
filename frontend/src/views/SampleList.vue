@@ -378,7 +378,7 @@
                     v-if="getSampleSpecimens(sample).length === 0"
                     class="specimens-empty"
                   >
-                    Нет аликвот
+                    Нет проб
                   </div>
                   <table v-else class="specimens-table">
                     <thead>
@@ -465,7 +465,7 @@
             </select>
           </div>
           <div class="form-group">
-            <label for="modalInitialQty">Начальное количество аликвот *</label>
+            <label for="modalInitialQty">Начальное количество проб *</label>
             <input
               id="modalInitialQty"
               v-model.number="modalSample.initialQuantity"
@@ -476,7 +476,7 @@
             />
           </div>
           <div class="form-group">
-            <label for="modalCurrentQty">Текущее количество аликвот *</label>
+            <label for="modalCurrentQty">Текущее количество проб *</label>
             <input
               id="modalCurrentQty"
               v-model.number="modalSample.currentQuantity"
@@ -528,8 +528,7 @@
                 :key="container.containerId"
                 :value="container.containerId"
               >
-                {{ container.containerType || "Контейнер" }}
-                №{{ container.containerNumber ?? "—" }}
+                {{ getContainerFullLabel(container) }}
               </option>
             </select>
           </div>
@@ -582,7 +581,7 @@
               </div>
             </div>
             <div v-else class="readonly-field">
-              Укажите начальное количество аликвот.
+              Укажите начальное количество проб.
             </div>
           </div>
           <div class="form-actions">
@@ -705,7 +704,8 @@ interface SampleStatusRef {
 interface ContainerRef {
   containerId: number;
   shelfNumber: string | null;
-  containerType: string | null;
+  containerType?: string | null;
+  templateName?: string | null;
   containerNumber: number | null;
   rowsCount: number | null;
   columnsCount: number | null;
@@ -930,9 +930,9 @@ export default defineComponent({
           "Национальность пациента, у которого взят биоматериал",
         sampleTypeId: "Вид забранного биологического материала",
         initialQuantity:
-          "Общее количество идентичных аликвот, полученных от пациента и первоначально зарегистрированных в хранилище",
+          "Общее количество идентичных проб, полученных от пациента и первоначально зарегистрированных в хранилище",
         currentQuantity:
-          "Текущее количество аликвот данного образца, оставшихся в хранилище на данный момент",
+          "Текущее количество проб данного образца, оставшихся в хранилище на данный момент",
         recommendedStorageMonths:
           "Срок, в течение которого образец гарантированно пригоден для анализа согласно протоколу исследования",
         actualStorageMonths:
@@ -1316,7 +1316,7 @@ export default defineComponent({
       const specimens = this.modalSample.specimens || [];
       if (quantity > 0 && specimens.length !== quantity) {
         this.errorMessage =
-          "Количество аликвот должно совпадать с начальным количеством.";
+          "Количество проб должно совпадать с начальным количеством.";
         return;
       }
       if (quantity > 0) {
@@ -1324,12 +1324,12 @@ export default defineComponent({
           (a) => !a.barcode || !a.barcode.trim()
         );
         if (emptyBarcodes.length > 0) {
-          this.errorMessage = "Укажите штрихкод для каждой аликвоты.";
+          this.errorMessage = "Укажите штрихкод для каждой пробы.";
           return;
         }
         const barcodeSet = new Set(specimens.map((a) => a.barcode.trim()));
         if (barcodeSet.size !== specimens.length) {
-          this.errorMessage = "Штрихкоды аликвот не должны повторяться.";
+          this.errorMessage = "Штрихкоды проб не должны повторяться.";
           return;
         }
       }
@@ -1718,15 +1718,47 @@ export default defineComponent({
       );
       return target?.sampleStatusId ?? null;
     },
+    numberingTypeLabel(type: string | null | undefined): string {
+      if (!type) return "";
+      const map: Record<string, string> = {
+        LETTER_DIGIT: "буква+цифра",
+        DIGIT_LETTER: "цифра+буква",
+        DIGIT_DIGIT: "цифра/цифра",
+        SEQUENTIAL: "сквозная",
+      };
+      return map[type] || type;
+    },
+    getContainerFullLabel(container: ContainerRef): string {
+      const name =
+        container.templateName || container.containerType || "Контейнер";
+      const number = container.containerNumber ?? container.containerId;
+      const rows = container.rowsCount;
+      const cols = container.columnsCount;
+      const numbering = this.numberingTypeLabel(container.numberingType);
+      const dims =
+        typeof rows === "number" &&
+        typeof cols === "number" &&
+        rows > 0 &&
+        cols > 0
+          ? `${rows}×${cols}`
+          : null;
+      const extra =
+        dims && numbering
+          ? ` (${dims}, ${numbering})`
+          : dims
+          ? ` (${dims})`
+          : numbering
+          ? ` (${numbering})`
+          : "";
+      return `${name}${extra} №${number}`;
+    },
     getContainerLabel(containerId: number | null | undefined) {
       if (!containerId) return "—";
       const container = this.containers.find(
         (item) => item.containerId === containerId
       );
       if (!container) return "—";
-      const type = container.containerType || "Контейнер";
-      const number = container.containerNumber ?? container.containerId;
-      return `${type} ${number}`;
+      return this.getContainerFullLabel(container);
     },
     formatDate(value: string) {
       if (!value) return "—";

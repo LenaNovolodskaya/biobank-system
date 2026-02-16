@@ -82,6 +82,31 @@
               <div class="location-meta">
                 {{ location.address }}, {{ location.roomNumber }}
               </div>
+              <div class="location-details-toggle-block">
+                <button
+                  type="button"
+                  class="btn-link"
+                  @click.stop="
+                    toggleLocationDetailsVisibility(location.locationId)
+                  "
+                >
+                  {{ getLocationDetailsToggleLabel(location) }}
+                </button>
+                <div
+                  v-if="showLocationDetailsId === location.locationId"
+                  class="location-details-content"
+                >
+                  <div v-if="location.description" class="location-description">
+                    {{ location.description }}
+                  </div>
+                  <div
+                    v-else
+                    class="location-description location-description-empty"
+                  >
+                    —
+                  </div>
+                </div>
+              </div>
               <div class="section-header">
                 <h4>Хранилища</h4>
                 <div class="action-buttons">
@@ -615,20 +640,19 @@
                   :key="container.containerId"
                   :value="container.containerId"
                 >
-                  {{ container.templateName || "Контейнер" }}
-                  №{{ container.containerNumber ?? "—" }}
+                  {{ getContainerFullLabel(container) }}
                 </option>
               </select>
             </div>
             <div class="form-group">
-              <label>Аликвоты</label>
+              <label>Пробы</label>
               <div v-if="drawerTubeCount > 0" class="tube-grid">
                 <div
                   v-for="(specimen, index) in drawerSampleForm.specimens"
                   :key="index"
                   class="tube-row"
                 >
-                  <div class="tube-label">Аликвота {{ index + 1 }}</div>
+                  <div class="tube-label">Проба {{ index + 1 }}</div>
                   <input
                     v-model="specimen.barcode"
                     type="text"
@@ -668,9 +692,7 @@
                   </select>
                 </div>
               </div>
-              <div v-else class="readonly-field">
-                Укажите количество аликвот.
-              </div>
+              <div v-else class="readonly-field">Укажите количество проб.</div>
             </div>
             <div class="form-actions">
               <button type="submit" class="btn btn-primary">
@@ -826,15 +848,17 @@
 
           <template v-if="modalType === 'container'">
             <div class="form-group with-action">
-              <label for="modalContainerTemplate">Шаблон контейнера *</label>
+              <label for="modalContainerTemplate">Шаблон контейнера</label>
               <div class="input-action">
                 <select
                   id="modalContainerTemplate"
                   v-model.number="modalContainer.templateId"
                   class="form-control"
-                  required
+                  @change="onContainerTemplateChange"
                 >
-                  <option :value="null">— Выберите шаблон —</option>
+                  <option :value="null">
+                    — Выберите шаблон или введите свои данные —
+                  </option>
                   <option
                     v-for="t in containerTemplates"
                     :key="t.templateId"
@@ -891,25 +915,92 @@
               </div>
             </div>
             <div class="form-group">
-              <label for="modalContainerNumber">Номер контейнера</label>
+              <label for="modalTemplateName">Название контейнера</label>
               <input
-                id="modalContainerNumber"
-                v-model="modalContainer.containerNumber"
+                id="modalTemplateName"
+                v-model="modalContainer.templateName"
                 type="text"
                 class="form-control"
-                placeholder="A1, 1, Криобокс-1"
+                :disabled="!!modalContainer.templateId"
+                placeholder="Введите название шаблона"
               />
             </div>
-            <div class="form-group">
-              <label for="modalShelf">Номер полки</label>
-              <input
-                id="modalShelf"
-                v-model.number="modalContainer.shelfNumber"
-                type="number"
-                min="1"
-                class="form-control"
-                placeholder="1"
-              />
+            <div class="form-row">
+              <div class="form-group">
+                <label for="modalTemplateRows">Количество строк</label>
+                <input
+                  id="modalTemplateRows"
+                  v-model.number="modalContainer.rowsCount"
+                  type="number"
+                  min="1"
+                  class="form-control"
+                  :disabled="!!modalContainer.templateId"
+                />
+              </div>
+              <div class="form-group">
+                <label for="modalTemplateCols">Количество столбцов</label>
+                <input
+                  id="modalTemplateCols"
+                  v-model.number="modalContainer.columnsCount"
+                  type="number"
+                  min="1"
+                  class="form-control"
+                  :disabled="!!modalContainer.templateId"
+                />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Макс. кол-во проб</label>
+                <input
+                  :value="
+                    (modalContainer.rowsCount || 0) *
+                    (modalContainer.columnsCount || 0)
+                  "
+                  type="number"
+                  class="form-control"
+                  :disabled="!!modalContainer.templateId"
+                />
+              </div>
+              <div class="form-group">
+                <label for="modalTemplateNumbering">Тип нумерации</label>
+                <select
+                  id="modalTemplateNumbering"
+                  v-model="modalContainer.numberingType"
+                  class="form-control"
+                  :disabled="!!modalContainer.templateId"
+                >
+                  <option value="LETTER_DIGIT">буква+цифра</option>
+                  <option value="DIGIT_LETTER">цифра+буква</option>
+                  <option value="DIGIT_DIGIT">цифра/цифра</option>
+                  <option value="SEQUENTIAL">сквозная</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="modalContainerNumber">Номер контейнера *</label>
+                <input
+                  id="modalContainerNumber"
+                  v-model="modalContainer.containerNumber"
+                  type="text"
+                  required
+                  class="form-control"
+                  placeholder="A1, 1, Криобокс-1"
+                />
+              </div>
+              <div class="form-group">
+                <label for="modalShelf">Номер полки *</label>
+                <input
+                  id="modalShelf"
+                  v-model.number="modalContainer.shelfNumber"
+                  type="number"
+                  min="1"
+                  required
+                  class="form-control"
+                  placeholder="1"
+                />
+              </div>
             </div>
             <div v-if="modalMode === 'edit'" class="form-group">
               <label>Текущее кол-во образцов</label>
@@ -1157,6 +1248,10 @@ interface NewUnitForm {
 
 interface NewContainerForm {
   templateId: number | null;
+  templateName: string;
+  rowsCount: number;
+  columnsCount: number;
+  numberingType: string;
   containerNumber: string;
   shelfNumber: number | null;
   currentSamplesCount?: number;
@@ -1175,6 +1270,7 @@ export default defineComponent({
       successMessage: "",
       errorMessage: "",
       selectedLocationId: null as number | null,
+      showLocationDetailsId: null as number | null,
       selectedUnitId: null as number | null,
       selectedShelfIndex: null as number | null,
       selectedContainerId: null as number | null,
@@ -1195,6 +1291,10 @@ export default defineComponent({
       } as NewUnitForm,
       modalContainer: {
         templateId: null,
+        templateName: "",
+        rowsCount: 1,
+        columnsCount: 1,
+        numberingType: "LETTER_DIGIT",
         containerNumber: "",
         shelfNumber: null,
       } as NewContainerForm,
@@ -1895,15 +1995,36 @@ export default defineComponent({
       );
       return target?.sampleStatusId ?? null;
     },
+    getContainerFullLabel(container: StorageContainer): string {
+      const name = container.templateName || "Контейнер";
+      const number = container.containerNumber ?? container.containerId;
+      const rows = container.rowsCount;
+      const cols = container.columnsCount;
+      const numbering = this.numberingTypeLabel(container.numberingType);
+      const dims =
+        typeof rows === "number" &&
+        typeof cols === "number" &&
+        rows > 0 &&
+        cols > 0
+          ? `${rows}×${cols}`
+          : null;
+      const extra =
+        dims && numbering
+          ? ` (${dims}, ${numbering})`
+          : dims
+          ? ` (${dims})`
+          : numbering
+          ? ` (${numbering})`
+          : "";
+      return `${name}${extra} №${number}`;
+    },
     getContainerLabel(containerId: number | null | undefined) {
       if (!containerId) return "—";
       const container = this.containerRefs.find(
         (item) => item.containerId === containerId
       );
       if (!container) return "—";
-      const type = container.templateName || "Контейнер";
-      const number = container.containerNumber ?? container.containerId;
-      return `${type} ${number}`;
+      return this.getContainerFullLabel(container);
     },
     formatDate(value: string) {
       if (!value) return "—";
@@ -2293,7 +2414,7 @@ export default defineComponent({
       const specimens = this.drawerSampleForm.specimens || [];
       if (quantity > 0 && specimens.length !== quantity) {
         this.errorMessage =
-          "Количество аликвот должно совпадать с начальным количеством.";
+          "Количество проб должно совпадать с начальным количеством.";
         return;
       }
       if (quantity > 0) {
@@ -2301,12 +2422,12 @@ export default defineComponent({
           (a) => !a.barcode || !a.barcode.trim()
         );
         if (emptyBarcodes.length > 0) {
-          this.errorMessage = "Укажите штрихкод для каждой аликвоты.";
+          this.errorMessage = "Укажите штрихкод для каждой пробы.";
           return;
         }
         const barcodeSet = new Set(specimens.map((a) => a.barcode.trim()));
         if (barcodeSet.size !== specimens.length) {
-          this.errorMessage = "Штрихкоды аликвот не должны повторяться.";
+          this.errorMessage = "Штрихкоды проб не должны повторяться.";
           return;
         }
       }
@@ -2339,7 +2460,7 @@ export default defineComponent({
       const specimens = this.drawerSampleForm.specimens || [];
       if (quantity > 0 && specimens.length !== quantity) {
         this.errorMessage =
-          "Количество аликвот должно совпадать с начальным количеством.";
+          "Количество проб должно совпадать с начальным количеством.";
         return;
       }
       if (quantity > 0) {
@@ -2347,12 +2468,12 @@ export default defineComponent({
           (a) => !a.barcode || !a.barcode.trim()
         );
         if (emptyBarcodes.length > 0) {
-          this.errorMessage = "Укажите штрихкод для каждой аликвоты.";
+          this.errorMessage = "Укажите штрихкод для каждой пробы.";
           return;
         }
         const barcodeSet = new Set(specimens.map((a) => a.barcode.trim()));
         if (barcodeSet.size !== specimens.length) {
-          this.errorMessage = "Штрихкоды аликвот не должны повторяться.";
+          this.errorMessage = "Штрихкоды проб не должны повторяться.";
           return;
         }
       }
@@ -2512,8 +2633,20 @@ export default defineComponent({
       }
     },
     selectLocation(locationId: number) {
-      this.selectedLocationId =
-        this.selectedLocationId === locationId ? null : locationId;
+      const next = this.selectedLocationId === locationId ? null : locationId;
+      if (next !== this.selectedLocationId) {
+        this.showLocationDetailsId = null;
+      }
+      this.selectedLocationId = next;
+    },
+    toggleLocationDetailsVisibility(locationId: number) {
+      this.showLocationDetailsId =
+        this.showLocationDetailsId === locationId ? null : locationId;
+    },
+    getLocationDetailsToggleLabel(location: StorageLocation) {
+      return this.showLocationDetailsId === location.locationId
+        ? "Скрыть дополнительную информацию"
+        : "Показать дополнительную информацию";
     },
     selectUnit(unitId: number) {
       this.selectedUnitId = this.selectedUnitId === unitId ? null : unitId;
@@ -2665,10 +2798,32 @@ export default defineComponent({
       this.modalTitle = "Добавить контейнер";
       this.modalContainer = {
         templateId: null,
+        templateName: "",
+        rowsCount: 1,
+        columnsCount: 1,
+        numberingType: "LETTER_DIGIT",
         containerNumber: "",
         shelfNumber: shelfNum,
       };
       this.modalOpen = true;
+    },
+    onContainerTemplateChange() {
+      if (this.modalContainer.templateId) {
+        const t = this.containerTemplates.find(
+          (c) => c.templateId === this.modalContainer.templateId
+        );
+        if (t) {
+          this.modalContainer.templateName = t.templateName;
+          this.modalContainer.rowsCount = t.rowsCount;
+          this.modalContainer.columnsCount = t.columnsCount;
+          this.modalContainer.numberingType = t.numberingType || "LETTER_DIGIT";
+        }
+      } else {
+        this.modalContainer.templateName = "";
+        this.modalContainer.rowsCount = 1;
+        this.modalContainer.columnsCount = 1;
+        this.modalContainer.numberingType = "LETTER_DIGIT";
+      }
     },
     closeModal() {
       this.modalOpen = false;
@@ -2789,9 +2944,13 @@ export default defineComponent({
           this.modalContainer.templateId = created.templateId;
         }
         await this.fetchReferenceData();
+        this.onContainerTemplateChange();
         this.closeTemplateRefModal();
       } catch (error) {
-        this.errorMessage = "Ошибка при добавлении шаблона контейнера";
+        this.errorMessage = this.resolveErrorMessage(
+          error,
+          "Ошибка при добавлении шаблона контейнера"
+        );
       }
     },
     async updateTemplateRefModal() {
@@ -2807,9 +2966,15 @@ export default defineComponent({
           }
         );
         await this.fetchReferenceData();
+        if (this.modalContainer.templateId === this.templateRefModalId) {
+          this.onContainerTemplateChange();
+        }
         this.closeTemplateRefModal();
       } catch (error) {
-        this.errorMessage = "Ошибка при обновлении шаблона контейнера";
+        this.errorMessage = this.resolveErrorMessage(
+          error,
+          "Ошибка при обновлении шаблона контейнера"
+        );
       }
     },
     async deleteTemplateQuick(id: number | null) {
@@ -2823,7 +2988,10 @@ export default defineComponent({
         }
         await this.fetchReferenceData();
       } catch (error) {
-        this.errorMessage = "Ошибка при удалении шаблона контейнера";
+        this.errorMessage = this.resolveErrorMessage(
+          error,
+          "Ошибка при удалении шаблона контейнера"
+        );
       }
     },
     async submitModal() {
@@ -2897,15 +3065,40 @@ export default defineComponent({
         this.errorMessage = "Сначала выберите хранилище";
         return;
       }
-      const payload = {
-        templateId: this.modalContainer.templateId,
-        containerNumber: this.modalContainer.containerNumber || null,
+      if (!this.modalContainer.containerNumber?.trim()) {
+        this.errorMessage = "Укажите номер контейнера";
+        return;
+      }
+      if (this.modalContainer.shelfNumber == null) {
+        this.errorMessage = "Укажите номер полки";
+        return;
+      }
+      const payload: Record<string, unknown> = {
+        containerNumber: this.modalContainer.containerNumber.trim() || null,
         shelfNumber: this.modalContainer.shelfNumber,
       };
+      if (this.modalContainer.templateId) {
+        payload.templateId = this.modalContainer.templateId;
+      } else {
+        if (!this.modalContainer.templateName?.trim()) {
+          this.errorMessage =
+            "Укажите название шаблона или выберите существующий";
+          return;
+        }
+        payload.templateName = this.modalContainer.templateName.trim();
+        payload.rowsCount = this.modalContainer.rowsCount || 1;
+        payload.columnsCount = this.modalContainer.columnsCount || 1;
+        payload.numberingType =
+          this.modalContainer.numberingType || "LETTER_DIGIT";
+      }
       try {
-        await axios.post(`/storage/units/${unitId}/containers`, payload);
+        await axios.post(
+          `/storage/units/${unitId}/containers`,
+          payload as never
+        );
         this.successMessage = "Контейнер успешно добавлен";
         this.closeModal();
+        await this.fetchReferenceData();
         await this.fetchLocations();
         this.selectedUnitId = unitId;
       } catch (error: unknown) {
@@ -2955,11 +3148,19 @@ export default defineComponent({
       this.modalType = "container";
       this.modalMode = "edit";
       this.modalTitle = "Обновить контейнер";
+      const c = this.selectedContainer;
+      const t = this.containerTemplates.find(
+        (tmpl) => tmpl.templateId === c.templateId
+      );
       this.modalContainer = {
-        templateId: this.selectedContainer.templateId,
-        containerNumber: this.selectedContainer.containerNumber ?? "",
-        shelfNumber: this.selectedContainer.shelfNumber,
-        currentSamplesCount: this.selectedContainer.currentSamplesCount,
+        templateId: c.templateId,
+        templateName: c.templateName ?? t?.templateName ?? "",
+        rowsCount: c.rowsCount ?? t?.rowsCount ?? 1,
+        columnsCount: c.columnsCount ?? t?.columnsCount ?? 1,
+        numberingType: c.numberingType ?? t?.numberingType ?? "LETTER_DIGIT",
+        containerNumber: c.containerNumber ?? "",
+        shelfNumber: c.shelfNumber,
+        currentSamplesCount: c.currentSamplesCount ?? 0,
       };
       this.modalOpen = true;
     },
@@ -3261,6 +3462,12 @@ h2 {
   gap: 16px;
 }
 
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
 .form-group label {
   display: block;
   margin-bottom: 6px;
@@ -3315,6 +3522,43 @@ h2 {
   margin-top: 8px;
   color: var(--text-secondary);
   font-size: 0.9rem;
+}
+
+.location-details-toggle-block {
+  margin: 8px 0;
+}
+
+.location-details-toggle-block .btn-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.location-details-toggle-block .btn-link:hover {
+  color: var(--accent-hover, #5a4a3a);
+}
+
+.location-details-content {
+  margin-top: 8px;
+}
+
+.location-description {
+  margin-top: 8px;
+  padding: 8px;
+  background: #f5f0e8;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+}
+
+.location-description-empty {
+  color: var(--text-secondary);
+  font-style: italic;
 }
 
 .unit-title {

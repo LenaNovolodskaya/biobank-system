@@ -81,12 +81,13 @@ public class StorageService {
         if (name == null || name.isBlank()) {
             throw new RuntimeException("Укажите templateId или templateName для шаблона контейнера");
         }
-        return templateRepository.findByTemplateNameIgnoreCase(name.trim())
+        Integer rows = request.getRowsCount() != null ? request.getRowsCount() : 1;
+        Integer cols = request.getColumnsCount() != null ? request.getColumnsCount() : 1;
+        String numbering = request.getNumberingType() != null && !request.getNumberingType().isBlank()
+                ? request.getNumberingType() : "SEQUENTIAL";
+        return templateRepository.findByTemplateNameIgnoreCaseAndRowsCountAndColumnsCountAndNumberingType(
+                        name.trim(), rows, cols, numbering)
                 .orElseGet(() -> {
-                    Integer rows = request.getRowsCount() != null ? request.getRowsCount() : 1;
-                    Integer cols = request.getColumnsCount() != null ? request.getColumnsCount() : 1;
-                    String numbering = request.getNumberingType() != null && !request.getNumberingType().isBlank()
-                            ? request.getNumberingType() : "SEQUENTIAL";
                     ContainerTypeTemplate t = new ContainerTypeTemplate();
                     t.setTemplateName(name.trim());
                     t.setRowsCount(rows);

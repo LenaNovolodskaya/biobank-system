@@ -81,6 +81,9 @@ public class SampleService {
 
     @Transactional
     public SampleDTO createSample(CreateSampleRequest request) {
+        if (request.getVisitId() == null || !visitRepository.existsById(request.getVisitId())) {
+            throw new IllegalArgumentException("Нельзя создать образец: данного визита не существует.");
+        }
         Sample sample = new Sample();
         applyRequest(sample, request);
         Sample saved = sampleRepository.save(sample);
@@ -90,6 +93,9 @@ public class SampleService {
 
     @Transactional
     public SampleDTO updateSample(Long sampleId, CreateSampleRequest request) {
+        if (request.getVisitId() == null || !visitRepository.existsById(request.getVisitId())) {
+            throw new IllegalArgumentException("Нельзя обновить образец: данного визита не существует.");
+        }
         Sample sample = sampleRepository.findById(sampleId)
                 .orElseThrow(() -> new RuntimeException("Образец не найден"));
         java.util.Set<Long> oldContainerIds = sample.getSpecimens().stream()

@@ -11,9 +11,7 @@ import lombok.AllArgsConstructor;
  * DIGIT_DIGIT (1/1..5/5), SEQUENTIAL (1..25).
  */
 @Entity
-@Table(name = "container_type_templates", uniqueConstraints = {
-    @UniqueConstraint(columnNames = "template_name")
-})
+@Table(name = "container_type_templates")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

@@ -9,5 +9,9 @@ import java.util.Optional;
 @Repository
 public interface ContainerTypeTemplateRepository extends JpaRepository<ContainerTypeTemplate, Long> {
 
-    Optional<ContainerTypeTemplate> findByTemplateNameIgnoreCase(String templateName);
+    Optional<ContainerTypeTemplate> findByTemplateNameIgnoreCaseAndRowsCountAndColumnsCountAndNumberingType(
+            String templateName, Integer rowsCount, Integer columnsCount, String numberingType);
+
+    boolean existsByTemplateNameIgnoreCaseAndRowsCountAndColumnsCountAndNumberingTypeAndTemplateIdNot(
+            String templateName, Integer rowsCount, Integer columnsCount, String numberingType, Long templateId);
 }

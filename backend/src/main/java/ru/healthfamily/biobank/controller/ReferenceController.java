@@ -84,6 +84,10 @@ public class ReferenceController {
         Integer rows = body.get("rowsCount") != null ? ((Number) body.get("rowsCount")).intValue() : 1;
         Integer cols = body.get("columnsCount") != null ? ((Number) body.get("columnsCount")).intValue() : 1;
         String numbering = body.get("numberingType") != null ? String.valueOf(body.get("numberingType")) : "SEQUENTIAL";
+        if (containerTypeTemplateRepository.findByTemplateNameIgnoreCaseAndRowsCountAndColumnsCountAndNumberingType(
+                name, rows, cols, numbering).isPresent()) {
+            throw new RuntimeException("Шаблон контейнера с такими параметрами уже существует");
+        }
         ContainerTypeTemplate t = new ContainerTypeTemplate();
         t.setTemplateName(name);
         t.setRowsCount(rows);
@@ -107,6 +111,10 @@ public class ReferenceController {
         Integer rows = body.get("rowsCount") != null ? ((Number) body.get("rowsCount")).intValue() : t.getRowsCount();
         Integer cols = body.get("columnsCount") != null ? ((Number) body.get("columnsCount")).intValue() : t.getColumnsCount();
         String numbering = body.get("numberingType") != null ? String.valueOf(body.get("numberingType")) : t.getNumberingType();
+        if (containerTypeTemplateRepository.existsByTemplateNameIgnoreCaseAndRowsCountAndColumnsCountAndNumberingTypeAndTemplateIdNot(
+                name, rows, cols, numbering, id)) {
+            throw new RuntimeException("Шаблон контейнера с такими параметрами уже существует");
+        }
         t.setTemplateName(name);
         t.setRowsCount(rows);
         t.setColumnsCount(cols);
