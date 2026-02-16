@@ -1038,8 +1038,8 @@ h2 {
   max-width: 12%;
 }
 .visit-table .research-col {
-  width: 20%;
-  max-width: 20%;
+  width: 22%;
+  max-width: 22%;
 }
 .visit-table .number-col {
   width: 5%;
