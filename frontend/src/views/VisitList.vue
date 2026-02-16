@@ -22,7 +22,10 @@
       {{ errorMessage }}
     </div>
 
-    <div class="card table-card">
+    <div
+      class="card table-card"
+      :class="{ 'empty-table': !loading && visits.length === 0 }"
+    >
       <p v-if="loading">Загрузка...</p>
       <div v-else class="table-wrapper" @click="activeHeaderHelp = null">
         <table class="visit-table">
@@ -940,7 +943,7 @@ export default defineComponent({
       const pad = (value: number) => String(value).padStart(2, "0");
       return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
         now.getDate()
-      )}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      )}T08:00`;
     },
     formatDate(value: string) {
       if (!value) return "—";
@@ -1009,6 +1012,10 @@ h2 {
 .table-wrapper {
   width: 100%;
   overflow: auto;
+}
+
+.table-card.empty-table .table-wrapper {
+  min-height: 160px;
 }
 
 .visit-table {

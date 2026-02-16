@@ -11,6 +11,7 @@ import ru.healthfamily.biobank.model.Visit;
 import ru.healthfamily.biobank.repository.PatientRepository;
 import ru.healthfamily.biobank.repository.SampleRepository;
 import ru.healthfamily.biobank.repository.VisitRepository;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -61,7 +62,9 @@ public class VisitService {
         visit.setPatientId(request.getPatientId());
         visit.setResearchId(request.getResearchId());
         visit.setVisitNumber(request.getVisitNumber());
-        visit.setCollectionDate(request.getCollectionDate());
+        visit.setCollectionDate(request.getCollectionDate() != null
+                ? request.getCollectionDate()
+                : LocalDate.now().atTime(8, 0));
         visit.setAgeAtCollection(request.getAgeAtCollection());
     }
 

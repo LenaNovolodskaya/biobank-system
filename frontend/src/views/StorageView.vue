@@ -737,23 +737,68 @@
           </template>
 
           <template v-if="modalType === 'unit'">
-            <div class="form-group">
+            <div class="form-group with-action">
               <label for="modalUnitType">Тип хранилища *</label>
-              <select
-                id="modalUnitType"
-                v-model.number="modalUnit.unitTypeId"
-                class="form-control"
-                required
-              >
-                <option :value="null">— Выберите тип —</option>
-                <option
-                  v-for="ut in unitTypes"
-                  :key="ut.unitTypeId"
-                  :value="ut.unitTypeId"
+              <div class="input-action">
+                <select
+                  id="modalUnitType"
+                  v-model.number="modalUnit.unitTypeId"
+                  class="form-control"
+                  required
                 >
-                  {{ ut.unitTypeName }}
-                </option>
-              </select>
+                  <option :value="null">— Выберите тип —</option>
+                  <option
+                    v-for="ut in unitTypes"
+                    :key="ut.unitTypeId"
+                    :value="ut.unitTypeId"
+                  >
+                    {{ ut.unitTypeName }}
+                  </option>
+                </select>
+                <div class="icon-actions">
+                  <button
+                    type="button"
+                    class="icon-button"
+                    @click="openUnitTypeRefModal()"
+                    aria-label="Добавить"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        d="M11 5h2v14h-2zM5 11h14v2H5z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-button"
+                    :disabled="!modalUnit.unitTypeId"
+                    @click="openUnitTypeRefModal(modalUnit.unitTypeId)"
+                    aria-label="Обновить"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-button danger"
+                    :disabled="!modalUnit.unitTypeId"
+                    @click="deleteUnitTypeQuick(modalUnit.unitTypeId)"
+                    aria-label="Удалить"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2H8l1-2z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
             </div>
             <div class="form-group">
               <label for="modalUnitName">Название *</label>
@@ -767,36 +812,83 @@
               />
             </div>
             <div class="form-group">
-              <label for="modalShelves">Полок</label>
+              <label for="modalShelves">Количество полок</label>
               <input
                 id="modalShelves"
                 v-model.number="modalUnit.shelvesCount"
                 type="number"
                 min="0"
                 class="form-control"
+                placeholder="Например, 5"
               />
             </div>
           </template>
 
           <template v-if="modalType === 'container'">
-            <div class="form-group">
+            <div class="form-group with-action">
               <label for="modalContainerTemplate">Шаблон контейнера *</label>
-              <select
-                id="modalContainerTemplate"
-                v-model.number="modalContainer.templateId"
-                class="form-control"
-                required
-              >
-                <option :value="null">— Выберите шаблон —</option>
-                <option
-                  v-for="t in containerTemplates"
-                  :key="t.templateId"
-                  :value="t.templateId"
+              <div class="input-action">
+                <select
+                  id="modalContainerTemplate"
+                  v-model.number="modalContainer.templateId"
+                  class="form-control"
+                  required
                 >
-                  {{ t.templateName }} ({{ t.rowsCount }}×{{ t.columnsCount }},
-                  {{ numberingTypeLabel(t.numberingType) }})
-                </option>
-              </select>
+                  <option :value="null">— Выберите шаблон —</option>
+                  <option
+                    v-for="t in containerTemplates"
+                    :key="t.templateId"
+                    :value="t.templateId"
+                  >
+                    {{ t.templateName }} ({{ t.rowsCount }}×{{
+                      t.columnsCount
+                    }}, {{ numberingTypeLabel(t.numberingType) }})
+                  </option>
+                </select>
+                <div class="icon-actions">
+                  <button
+                    type="button"
+                    class="icon-button"
+                    @click="openTemplateRefModal()"
+                    aria-label="Добавить"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        d="M11 5h2v14h-2zM5 11h14v2H5z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-button"
+                    :disabled="!modalContainer.templateId"
+                    @click="openTemplateRefModal(modalContainer.templateId)"
+                    aria-label="Обновить"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-button danger"
+                    :disabled="!modalContainer.templateId"
+                    @click="deleteTemplateQuick(modalContainer.templateId)"
+                    aria-label="Удалить"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2H8l1-2z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
             </div>
             <div class="form-group">
               <label for="modalContainerNumber">Номер контейнера</label>
@@ -833,6 +925,102 @@
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">
               {{ modalMode === "edit" ? "Обновить" : "Добавить" }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div
+      v-if="unitTypeRefModalOpen"
+      class="modal-overlay"
+      @click.self="closeUnitTypeRefModal"
+    >
+      <div class="modal">
+        <div class="modal-header">
+          <h3>{{ unitTypeRefModalTitle }}</h3>
+          <button class="btn btn-secondary" @click="closeUnitTypeRefModal">
+            Закрыть
+          </button>
+        </div>
+        <form class="form-grid" @submit.prevent="submitUnitTypeRefModal">
+          <div class="form-group">
+            <label for="unitTypeRefName">Название</label>
+            <input
+              id="unitTypeRefName"
+              v-model="unitTypeRefModalName"
+              type="text"
+              class="form-control"
+              placeholder="Введите название типа хранилища"
+            />
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+              {{ unitTypeRefModalMode === "edit" ? "Обновить" : "Добавить" }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div
+      v-if="templateRefModalOpen"
+      class="modal-overlay"
+      @click.self="closeTemplateRefModal"
+    >
+      <div class="modal">
+        <div class="modal-header">
+          <h3>{{ templateRefModalTitle }}</h3>
+          <button class="btn btn-secondary" @click="closeTemplateRefModal">
+            Закрыть
+          </button>
+        </div>
+        <form class="form-grid" @submit.prevent="submitTemplateRefModal">
+          <div class="form-group">
+            <label for="templateRefName">Название *</label>
+            <input
+              id="templateRefName"
+              v-model="templateRefModalName"
+              type="text"
+              required
+              class="form-control"
+              placeholder="Введите название шаблона"
+            />
+          </div>
+          <div class="form-group">
+            <label for="templateRefRows">Строк</label>
+            <input
+              id="templateRefRows"
+              v-model.number="templateRefModalRows"
+              type="number"
+              min="1"
+              class="form-control"
+            />
+          </div>
+          <div class="form-group">
+            <label for="templateRefCols">Столбцов</label>
+            <input
+              id="templateRefCols"
+              v-model.number="templateRefModalCols"
+              type="number"
+              min="1"
+              class="form-control"
+            />
+          </div>
+          <div class="form-group">
+            <label for="templateRefNumbering">Тип нумерации</label>
+            <select
+              id="templateRefNumbering"
+              v-model="templateRefModalNumbering"
+              class="form-control"
+            >
+              <option value="LETTER_DIGIT">буква+цифра</option>
+              <option value="DIGIT_LETTER">цифра+буква</option>
+              <option value="DIGIT_DIGIT">цифра/цифра</option>
+              <option value="SEQUENTIAL">сквозная</option>
+            </select>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+              {{ templateRefModalMode === "edit" ? "Обновить" : "Добавить" }}
             </button>
           </div>
         </form>
@@ -1021,6 +1209,19 @@ export default defineComponent({
       sampleStatuses: [] as SampleStatusRef[],
       containerTemplates: [] as ContainerTypeTemplate[],
       unitTypes: [] as Array<{ unitTypeId: number; unitTypeName: string }>,
+      unitTypeRefModalOpen: false,
+      unitTypeRefModalTitle: "",
+      unitTypeRefModalMode: "create" as "create" | "edit",
+      unitTypeRefModalId: null as number | null,
+      unitTypeRefModalName: "",
+      templateRefModalOpen: false,
+      templateRefModalTitle: "",
+      templateRefModalMode: "create" as "create" | "edit",
+      templateRefModalId: null as number | null,
+      templateRefModalName: "",
+      templateRefModalRows: 1,
+      templateRefModalCols: 1,
+      templateRefModalNumbering: "LETTER_DIGIT",
       sampleDrawerOpen: false,
       sampleDrawerMode: null as "details" | "create" | "edit" | null,
       drawerFormInitializing: false,
@@ -2474,6 +2675,157 @@ export default defineComponent({
       this.modalType = null;
       this.modalTitle = "";
     },
+    openUnitTypeRefModal(presetId: number | null = null) {
+      this.unitTypeRefModalId = presetId;
+      this.unitTypeRefModalName = "";
+      this.unitTypeRefModalMode = presetId ? "edit" : "create";
+      this.unitTypeRefModalTitle =
+        this.unitTypeRefModalMode === "edit"
+          ? "Обновить тип хранилища"
+          : "Добавить тип хранилища";
+      if (this.unitTypeRefModalId) {
+        const item = this.unitTypes.find(
+          (ut) => ut.unitTypeId === this.unitTypeRefModalId
+        );
+        this.unitTypeRefModalName = item?.unitTypeName || "";
+      }
+      this.unitTypeRefModalOpen = true;
+    },
+    closeUnitTypeRefModal() {
+      this.unitTypeRefModalOpen = false;
+    },
+    async submitUnitTypeRefModal() {
+      if (!this.unitTypeRefModalName.trim()) {
+        return;
+      }
+      if (this.unitTypeRefModalMode === "edit") {
+        await this.updateUnitTypeRefModal();
+        return;
+      }
+      try {
+        const response = await axios.post("/references/unit-types", {
+          name: this.unitTypeRefModalName,
+        });
+        const created = response.data as { unitTypeId: number };
+        if (created?.unitTypeId) {
+          this.modalUnit.unitTypeId = created.unitTypeId;
+        }
+        await this.fetchReferenceData();
+        this.closeUnitTypeRefModal();
+      } catch (error) {
+        this.errorMessage = "Ошибка при добавлении типа хранилища";
+      }
+    },
+    async updateUnitTypeRefModal() {
+      if (!this.unitTypeRefModalId || !this.unitTypeRefModalName.trim()) {
+        return;
+      }
+      try {
+        await axios.put(`/references/unit-types/${this.unitTypeRefModalId}`, {
+          name: this.unitTypeRefModalName,
+        });
+        await this.fetchReferenceData();
+        this.closeUnitTypeRefModal();
+      } catch (error) {
+        this.errorMessage = "Ошибка при обновлении типа хранилища";
+      }
+    },
+    async deleteUnitTypeQuick(id: number | null) {
+      if (!id) return;
+      const confirmed = window.confirm("Удалить выбранный тип хранилища?");
+      if (!confirmed) return;
+      try {
+        await axios.delete(`/references/unit-types/${id}`);
+        if (this.modalUnit.unitTypeId === id) {
+          this.modalUnit.unitTypeId = null;
+        }
+        await this.fetchReferenceData();
+      } catch (error) {
+        this.errorMessage = "Ошибка при удалении типа хранилища";
+      }
+    },
+    openTemplateRefModal(presetId: number | null = null) {
+      this.templateRefModalId = presetId;
+      this.templateRefModalName = "";
+      this.templateRefModalRows = 1;
+      this.templateRefModalCols = 1;
+      this.templateRefModalNumbering = "LETTER_DIGIT";
+      this.templateRefModalMode = presetId ? "edit" : "create";
+      this.templateRefModalTitle =
+        this.templateRefModalMode === "edit"
+          ? "Обновить шаблон контейнера"
+          : "Добавить шаблон контейнера";
+      if (this.templateRefModalId) {
+        const t = this.containerTemplates.find(
+          (c) => c.templateId === this.templateRefModalId
+        );
+        if (t) {
+          this.templateRefModalName = t.templateName;
+          this.templateRefModalRows = t.rowsCount;
+          this.templateRefModalCols = t.columnsCount;
+          this.templateRefModalNumbering = t.numberingType || "LETTER_DIGIT";
+        }
+      }
+      this.templateRefModalOpen = true;
+    },
+    closeTemplateRefModal() {
+      this.templateRefModalOpen = false;
+    },
+    async submitTemplateRefModal() {
+      if (!this.templateRefModalName.trim()) return;
+      if (this.templateRefModalMode === "edit") {
+        await this.updateTemplateRefModal();
+        return;
+      }
+      try {
+        const response = await axios.post("/references/container-templates", {
+          templateName: this.templateRefModalName,
+          rowsCount: this.templateRefModalRows || 1,
+          columnsCount: this.templateRefModalCols || 1,
+          numberingType: this.templateRefModalNumbering,
+        });
+        const created = response.data as { templateId: number };
+        if (created?.templateId) {
+          this.modalContainer.templateId = created.templateId;
+        }
+        await this.fetchReferenceData();
+        this.closeTemplateRefModal();
+      } catch (error) {
+        this.errorMessage = "Ошибка при добавлении шаблона контейнера";
+      }
+    },
+    async updateTemplateRefModal() {
+      if (!this.templateRefModalId || !this.templateRefModalName.trim()) return;
+      try {
+        await axios.put(
+          `/references/container-templates/${this.templateRefModalId}`,
+          {
+            templateName: this.templateRefModalName,
+            rowsCount: this.templateRefModalRows || 1,
+            columnsCount: this.templateRefModalCols || 1,
+            numberingType: this.templateRefModalNumbering,
+          }
+        );
+        await this.fetchReferenceData();
+        this.closeTemplateRefModal();
+      } catch (error) {
+        this.errorMessage = "Ошибка при обновлении шаблона контейнера";
+      }
+    },
+    async deleteTemplateQuick(id: number | null) {
+      if (!id) return;
+      const confirmed = window.confirm("Удалить выбранный шаблон контейнера?");
+      if (!confirmed) return;
+      try {
+        await axios.delete(`/references/container-templates/${id}`);
+        if (this.modalContainer.templateId === id) {
+          this.modalContainer.templateId = null;
+        }
+        await this.fetchReferenceData();
+      } catch (error) {
+        this.errorMessage = "Ошибка при удалении шаблона контейнера";
+      }
+    },
     async submitModal() {
       if (this.modalType === "location" && this.modalMode === "create") {
         await this.addLocation();
@@ -2905,7 +3257,7 @@ h2 {
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: 1fr;
   gap: 16px;
 }
 
@@ -2914,6 +3266,18 @@ h2 {
   margin-bottom: 6px;
   color: var(--text-secondary);
   font-weight: 600;
+}
+
+.with-action .input-action {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.icon-actions {
+  display: flex;
+  gap: 6px;
 }
 
 .form-control {

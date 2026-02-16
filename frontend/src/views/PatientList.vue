@@ -273,7 +273,7 @@
                 <button
                   type="button"
                   class="icon-button"
-                  @click="openDiagnosisModal()"
+                  @click="openDiagnosisModal(null, 'main')"
                   aria-label="Добавить"
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -284,7 +284,9 @@
                   type="button"
                   class="icon-button"
                   :disabled="!modalPatient.mainDiagnosisId"
-                  @click="openDiagnosisModal(modalPatient.mainDiagnosisId)"
+                  @click="
+                    openDiagnosisModal(modalPatient.mainDiagnosisId, null)
+                  "
                   aria-label="Обновить"
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -333,7 +335,7 @@
                 <button
                   type="button"
                   class="icon-button"
-                  @click="openDiagnosisModal()"
+                  @click="openDiagnosisModal(null, 'comorbid')"
                   aria-label="Добавить"
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -344,7 +346,9 @@
                   type="button"
                   class="icon-button"
                   :disabled="!getSingleComorbidDiagnosisId()"
-                  @click="openDiagnosisModal(getSingleComorbidDiagnosisId())"
+                  @click="
+                    openDiagnosisModal(getSingleComorbidDiagnosisId(), null)
+                  "
                   aria-label="Обновить"
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -537,6 +541,7 @@ export default defineComponent({
       diagDiagnosisId: null as number | null,
       diagDiagnosisCode: "",
       diagDiagnosisName: "",
+      diagnosisAddContext: null as "main" | "comorbid" | null,
       showComorbidPatientId: null as number | null,
     };
   },
@@ -593,8 +598,12 @@ export default defineComponent({
         console.error("Ошибка при загрузке диагнозов:", error);
       }
     },
-    openDiagnosisModal(presetId: number | null = null) {
+    openDiagnosisModal(
+      presetId: number | null = null,
+      addContext: "main" | "comorbid" | null = null
+    ) {
       this.diagDiagnosisId = presetId;
+      this.diagnosisAddContext = addContext;
       this.diagDiagnosisCode = "";
       this.diagDiagnosisName = "";
       this.diagModalMode = presetId ? "edit" : "create";
@@ -607,6 +616,7 @@ export default defineComponent({
     },
     closeDiagnosisModal() {
       this.diagModalOpen = false;
+      this.diagnosisAddContext = null;
     },
     fillDiagnosisModal() {
       const diagnosis = this.diagnoses.find(
@@ -624,10 +634,27 @@ export default defineComponent({
         return;
       }
       try {
-        await axios.post("/references/diagnoses", {
+        const response = await axios.post("/references/diagnoses", {
           icd10Code: this.diagDiagnosisCode,
           diagnosisName: this.diagDiagnosisName,
         });
+        const created = response.data as DiagnosisRef | undefined;
+        if (created?.diagnosisId) {
+          if (this.diagnosisAddContext === "main") {
+            this.modalPatient.mainDiagnosisId = created.diagnosisId;
+          } else if (this.diagnosisAddContext === "comorbid") {
+            if (
+              !this.modalPatient.comorbidDiagnosisIds.includes(
+                created.diagnosisId
+              )
+            ) {
+              this.modalPatient.comorbidDiagnosisIds = [
+                ...this.modalPatient.comorbidDiagnosisIds,
+                created.diagnosisId,
+              ];
+            }
+          }
+        }
         await this.fetchDiagnoses();
         this.closeDiagnosisModal();
       } catch (error) {
@@ -940,8 +967,7 @@ export default defineComponent({
       const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
         now.getDate()
       )}`;
-      const time = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-      return `${date}T${time}`;
+      return `${date}T08:00`;
     },
     toDateTimeLocal(dateTimeString: string | null | undefined): string {
       if (!dateTimeString) {

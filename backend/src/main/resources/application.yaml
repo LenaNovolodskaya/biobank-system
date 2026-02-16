@@ -35,7 +35,7 @@ spring:
       # Разделитель // — чтобы не разбивать PL/pgSQL функции по ; внутри тела
       separator: "//"
       schema-locations: []
-      data-locations: classpath:data.sql, classpath:trigger.sql
+      data-locations: classpath:data.sql
   
   # Отключаем CORS на время разработки
   web:

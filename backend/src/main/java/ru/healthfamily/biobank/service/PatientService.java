@@ -11,6 +11,7 @@ import ru.healthfamily.biobank.repository.NationalityRepository;
 import ru.healthfamily.biobank.repository.PatientRepository;
 import ru.healthfamily.biobank.repository.SampleRepository;
 import ru.healthfamily.biobank.repository.VisitRepository;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,7 +46,7 @@ public class PatientService {
         patient.setCreatedAtPatient(
                 request.getCreatedAtPatient() != null
                         ? request.getCreatedAtPatient()
-                        : LocalDateTime.now()
+                        : LocalDate.now().atTime(8, 0)
         );
         
         // Если указана национальность, находим её

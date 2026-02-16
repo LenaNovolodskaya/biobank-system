@@ -260,7 +260,10 @@
       </div>
     </div>
 
-    <div class="card table-card">
+    <div
+      class="card table-card"
+      :class="{ 'empty-table': !loading && filteredSamples.length === 0 }"
+    >
       <p v-if="loading">Загрузка...</p>
       <div v-else class="table-wrapper" @click="activeHeaderHelp = null">
         <table class="samples-table">
@@ -2062,6 +2065,10 @@ h2 {
 .table-wrapper {
   width: 100%;
   overflow: auto;
+}
+
+.table-card.empty-table .table-wrapper {
+  min-height: 160px;
 }
 
 .samples-table {

@@ -93,6 +93,34 @@ public class ReferenceController {
         return ResponseEntity.ok(containerTypeTemplateRepository.save(t));
     }
 
+    @PutMapping("/container-templates/{id}")
+    public ResponseEntity<ContainerTypeTemplate> updateContainerTemplate(
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, Object> body
+    ) {
+        ContainerTypeTemplate t = containerTypeTemplateRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Шаблон контейнера не найден"));
+        String name = String.valueOf(body.getOrDefault("templateName", "")).trim();
+        if (name.isEmpty()) {
+            throw new RuntimeException("Название шаблона обязательно");
+        }
+        Integer rows = body.get("rowsCount") != null ? ((Number) body.get("rowsCount")).intValue() : t.getRowsCount();
+        Integer cols = body.get("columnsCount") != null ? ((Number) body.get("columnsCount")).intValue() : t.getColumnsCount();
+        String numbering = body.get("numberingType") != null ? String.valueOf(body.get("numberingType")) : t.getNumberingType();
+        t.setTemplateName(name);
+        t.setRowsCount(rows);
+        t.setColumnsCount(cols);
+        t.setMaxSamplesCount(rows * cols);
+        t.setNumberingType(numbering);
+        return ResponseEntity.ok(containerTypeTemplateRepository.save(t));
+    }
+
+    @DeleteMapping("/container-templates/{id}")
+    public ResponseEntity<Void> deleteContainerTemplate(@PathVariable Long id) {
+        containerTypeTemplateRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/genders")
     public ResponseEntity<List<String>> getAllGenders() {
         List<String> genders = List.of("UNKNOWN", "MALE", "FEMALE");
@@ -102,6 +130,31 @@ public class ReferenceController {
     @GetMapping("/unit-types")
     public ResponseEntity<List<UnitType>> getUnitTypes() {
         return ResponseEntity.ok(unitTypeRepository.findAll());
+    }
+
+    @PostMapping("/unit-types")
+    public ResponseEntity<UnitType> createUnitType(@RequestBody Map<String, String> body) {
+        String name = body.getOrDefault("name", "").trim();
+        UnitType unitType = new UnitType();
+        unitType.setUnitTypeName(name);
+        return ResponseEntity.ok(unitTypeRepository.save(unitType));
+    }
+
+    @PutMapping("/unit-types/{id}")
+    public ResponseEntity<UnitType> updateUnitType(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body
+    ) {
+        UnitType unitType = unitTypeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Тип хранилища не найден"));
+        unitType.setUnitTypeName(body.getOrDefault("name", "").trim());
+        return ResponseEntity.ok(unitTypeRepository.save(unitType));
+    }
+
+    @DeleteMapping("/unit-types/{id}")
+    public ResponseEntity<Void> deleteUnitType(@PathVariable Long id) {
+        unitTypeRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/sample-types")

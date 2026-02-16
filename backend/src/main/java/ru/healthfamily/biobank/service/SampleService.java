@@ -14,6 +14,7 @@ import ru.healthfamily.biobank.model.Sample.ExpiryStatus;
 import ru.healthfamily.biobank.repository.SpecimenRepository;
 import ru.healthfamily.biobank.repository.SampleRepository;
 import ru.healthfamily.biobank.repository.SampleStatusRepository;
+import ru.healthfamily.biobank.repository.StorageContainerRepository;
 import ru.healthfamily.biobank.repository.VisitRepository;
 
 import java.time.LocalDate;
@@ -34,6 +35,7 @@ public class SampleService {
     private final SampleRepository sampleRepository;
     private final SpecimenRepository specimenRepository;
     private final SampleStatusRepository sampleStatusRepository;
+    private final StorageContainerRepository containerRepository;
     private final VisitRepository visitRepository;
     private final EntityManager entityManager;
 
@@ -81,22 +83,57 @@ public class SampleService {
     public SampleDTO createSample(CreateSampleRequest request) {
         Sample sample = new Sample();
         applyRequest(sample, request);
-        return toDTO(sampleRepository.save(sample));
+        Sample saved = sampleRepository.save(sample);
+        updateContainerCountsFromSpecimens(saved.getSpecimens());
+        return toDTO(saved);
     }
 
     @Transactional
     public SampleDTO updateSample(Long sampleId, CreateSampleRequest request) {
         Sample sample = sampleRepository.findById(sampleId)
                 .orElseThrow(() -> new RuntimeException("Образец не найден"));
+        java.util.Set<Long> oldContainerIds = sample.getSpecimens().stream()
+                .map(Specimen::getContainerId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
         applyRequest(sample, request);
-        return toDTO(sampleRepository.save(sample));
+        Sample saved = sampleRepository.save(sample);
+        java.util.Set<Long> newContainerIds = saved.getSpecimens().stream()
+                .map(Specimen::getContainerId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        java.util.Set<Long> affected = new java.util.HashSet<>(oldContainerIds);
+        affected.addAll(newContainerIds);
+        affected.forEach(this::recalculateContainerCount);
+        return toDTO(saved);
     }
 
     @Transactional
     public void deleteSample(Long sampleId) {
         Sample sample = sampleRepository.findById(sampleId)
                 .orElseThrow(() -> new RuntimeException("Образец не найден"));
+        java.util.Set<Long> containerIds = sample.getSpecimens().stream()
+                .map(Specimen::getContainerId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
         sampleRepository.delete(sample);
+        containerIds.forEach(this::recalculateContainerCount);
+    }
+
+    private void updateContainerCountsFromSpecimens(List<Specimen> specimens) {
+        specimens.stream()
+                .map(Specimen::getContainerId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .forEach(this::recalculateContainerCount);
+    }
+
+    private void recalculateContainerCount(Long containerId) {
+        containerRepository.findById(containerId).ifPresent(container -> {
+            long count = specimenRepository.countByContainerId(containerId);
+            container.setCurrentSamplesCount((int) count);
+            containerRepository.save(container);
+        });
     }
 
     private boolean matchesSearch(Sample sample, String search, List<Specimen> sampleSpecimens) {
@@ -127,7 +164,7 @@ public class SampleService {
             visitRepository.findById(request.getVisitId())
                     .map(visit -> visit.getCollectionDate())
                     .ifPresentOrElse(sample::setCreatedAtSample,
-                            () -> sample.setCreatedAtSample(LocalDateTime.now()));
+                            () -> sample.setCreatedAtSample(LocalDate.now().atTime(8, 0)));
         }
         sample.setContainerId(request.getContainerId());
         applyStorageStatus(sample);

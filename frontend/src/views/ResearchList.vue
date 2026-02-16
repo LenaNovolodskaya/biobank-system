@@ -22,7 +22,10 @@
       {{ errorMessage }}
     </div>
 
-    <div class="card table-card">
+    <div
+      class="card table-card"
+      :class="{ 'empty-table': !loading && researches.length === 0 }"
+    >
       <p v-if="loading">Загрузка...</p>
       <div v-else class="table-wrapper" @click="activeHeaderHelp = null">
         <table class="research-table">
@@ -218,6 +221,7 @@
               required
               type="text"
               class="form-control"
+              placeholder="Введите номер исследования"
             />
           </div>
           <div class="form-group">
@@ -228,6 +232,7 @@
               required
               type="text"
               class="form-control"
+              placeholder="Введите название исследования"
             />
           </div>
           <div class="form-group with-action">
@@ -238,7 +243,7 @@
                 v-model="modalResearch.researchGroupId"
                 class="form-control"
               >
-                <option value="">Не указано</option>
+                <option :value="null">Не указано</option>
                 <option
                   v-for="group in researchGroups"
                   :key="group.id"
@@ -299,7 +304,7 @@
                 v-model="modalResearch.financingSourceId"
                 class="form-control"
               >
-                <option value="">Не указано</option>
+                <option :value="null">Не указано</option>
                 <option
                   v-for="source in financingSources"
                   :key="source.id"
@@ -362,7 +367,7 @@
                 v-model="modalResearch.departmentId"
                 class="form-control"
               >
-                <option value="">Не указано</option>
+                <option :value="null">Не указано</option>
                 <option
                   v-for="department in departments"
                   :key="department.id"
@@ -720,19 +725,31 @@ export default defineComponent({
       }
       try {
         if (this.refModalType === "group") {
-          await axios.post("/references/research-groups", {
+          const response = await axios.post("/references/research-groups", {
             name: this.refModalName,
           });
+          const created = response.data as { researchGroupId: number };
+          if (created?.researchGroupId) {
+            this.modalResearch.researchGroupId = created.researchGroupId;
+          }
         }
         if (this.refModalType === "financing") {
-          await axios.post("/references/financing-sources", {
+          const response = await axios.post("/references/financing-sources", {
             name: this.refModalName,
           });
+          const created = response.data as { financingSourceId: number };
+          if (created?.financingSourceId) {
+            this.modalResearch.financingSourceId = created.financingSourceId;
+          }
         }
         if (this.refModalType === "department") {
-          await axios.post("/references/departments", {
+          const response = await axios.post("/references/departments", {
             name: this.refModalName,
           });
+          const created = response.data as { departmentId: number };
+          if (created?.departmentId) {
+            this.modalResearch.departmentId = created.departmentId;
+          }
         }
         await this.fetchReferences();
         this.closeRefModal();
@@ -922,6 +939,10 @@ h2 {
 .table-wrapper {
   width: 100%;
   overflow: auto;
+}
+
+.table-card.empty-table .table-wrapper {
+  min-height: 160px;
 }
 
 .research-table {

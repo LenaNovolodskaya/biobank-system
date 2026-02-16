@@ -17,4 +17,6 @@ public interface SpecimenRepository extends JpaRepository<Specimen, Long> {
 
     @Query("SELECT s FROM Specimen s LEFT JOIN FETCH s.sample")
     List<Specimen> findAllWithSample();
+
+    long countByContainerId(Long containerId);
 }

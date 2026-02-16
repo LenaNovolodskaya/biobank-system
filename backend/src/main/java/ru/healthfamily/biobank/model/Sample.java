@@ -4,9 +4,6 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
-
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,8 +42,7 @@ public class Sample {
     private Integer actualStorageMonths;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "expiry_status", columnDefinition = "expiry_status_type")
+    @Column(name = "expiry_status", length = 20)
     private ExpiryStatus expiryStatus = ExpiryStatus.GREEN;
 
     @Column(name = "container_id")

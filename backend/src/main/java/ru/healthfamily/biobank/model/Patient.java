@@ -2,8 +2,6 @@ package ru.healthfamily.biobank.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import java.time.LocalDate;
@@ -27,8 +25,7 @@ public class Patient {
     private String patientBarcode;
     
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "gender", columnDefinition = "gender_code_type")
+    @Column(name = "gender", length = 20)
     private Gender gender = Gender.UNKNOWN;
     
     @Column(name = "birth_date", nullable = false)
