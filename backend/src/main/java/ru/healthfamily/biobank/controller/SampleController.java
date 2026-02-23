@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
 import ru.healthfamily.biobank.dto.CreateSampleRequest;
 import ru.healthfamily.biobank.dto.SampleDTO;
@@ -27,6 +28,7 @@ public class SampleController {
     private final SampleService sampleService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('sample.view')")
     public ResponseEntity<List<SampleDTO>> getSamples(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Long containerId,
@@ -46,6 +48,7 @@ public class SampleController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('sample.create')")
     public ResponseEntity<SampleDTO> createSample(
             @Valid @RequestBody CreateSampleRequest request) {
         SampleDTO sample = sampleService.createSample(request);
@@ -53,6 +56,7 @@ public class SampleController {
     }
 
     @PutMapping("/{sampleId}")
+    @PreAuthorize("hasAuthority('sample.update')")
     public ResponseEntity<SampleDTO> updateSample(
             @PathVariable Long sampleId,
             @Valid @RequestBody CreateSampleRequest request) {
@@ -60,6 +64,7 @@ public class SampleController {
     }
 
     @DeleteMapping("/{sampleId}")
+    @PreAuthorize("hasAuthority('sample.delete')")
     public ResponseEntity<Void> deleteSample(@PathVariable Long sampleId) {
         sampleService.deleteSample(sampleId);
         return ResponseEntity.noContent().build();

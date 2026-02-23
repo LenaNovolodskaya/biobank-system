@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import ru.healthfamily.biobank.dto.CreateStorageContainerRequest;
 import ru.healthfamily.biobank.dto.CreateStorageLocationRequest;
@@ -21,7 +22,14 @@ public class StorageController {
 
     private final StorageService storageService;
 
+    @GetMapping("/locations")
+    @PreAuthorize("hasAuthority('storage.view')")
+    public ResponseEntity<List<StorageLocationDTO>> getAllLocations() {
+        return ResponseEntity.ok(storageService.getAllLocations());
+    }
+
     @PostMapping("/locations")
+    @PreAuthorize("hasAuthority('storage.create')")
     public ResponseEntity<StorageLocationDTO> createLocation(
             @Valid @RequestBody CreateStorageLocationRequest request) {
         StorageLocationDTO location = storageService.createLocation(request);
@@ -29,6 +37,7 @@ public class StorageController {
     }
 
     @PostMapping("/locations/{locationId}/units")
+    @PreAuthorize("hasAuthority('storage.create')")
     public ResponseEntity<StorageUnitDTO> addUnitToLocation(
             @PathVariable Long locationId,
             @Valid @RequestBody CreateStorageUnitRequest request) {
@@ -37,6 +46,7 @@ public class StorageController {
     }
 
     @PostMapping("/units/{unitId}/containers")
+    @PreAuthorize("hasAuthority('storage.create')")
     public ResponseEntity<StorageContainerDTO> addContainerToUnit(
             @PathVariable Long unitId,
             @Valid @RequestBody CreateStorageContainerRequest request) {
@@ -45,6 +55,7 @@ public class StorageController {
     }
 
     @PutMapping("/locations/{locationId}")
+    @PreAuthorize("hasAuthority('storage.update')")
     public ResponseEntity<StorageLocationDTO> updateLocation(
             @PathVariable Long locationId,
             @Valid @RequestBody CreateStorageLocationRequest request) {
@@ -52,6 +63,7 @@ public class StorageController {
     }
 
     @PutMapping("/units/{unitId}")
+    @PreAuthorize("hasAuthority('storage.update')")
     public ResponseEntity<StorageUnitDTO> updateUnit(
             @PathVariable Long unitId,
             @Valid @RequestBody CreateStorageUnitRequest request) {
@@ -59,40 +71,41 @@ public class StorageController {
     }
 
     @PutMapping("/containers/{containerId}")
+    @PreAuthorize("hasAuthority('storage.update')")
     public ResponseEntity<StorageContainerDTO> updateContainer(
             @PathVariable Long containerId,
             @Valid @RequestBody CreateStorageContainerRequest request) {
         return ResponseEntity.ok(storageService.updateContainer(containerId, request));
     }
 
-    @GetMapping("/locations")
-    public ResponseEntity<List<StorageLocationDTO>> getAllLocations() {
-        return ResponseEntity.ok(storageService.getAllLocations());
-    }
-
     @GetMapping("/units")
+    @PreAuthorize("hasAuthority('storage.view')")
     public ResponseEntity<List<StorageUnitDTO>> getAllUnits() {
         return ResponseEntity.ok(storageService.getAllUnits());
     }
 
     @GetMapping("/containers")
+    @PreAuthorize("hasAuthority('storage.view')")
     public ResponseEntity<List<StorageContainerDTO>> getAllContainers() {
         return ResponseEntity.ok(storageService.getAllContainers());
     }
 
     @DeleteMapping("/locations/{locationId}")
+    @PreAuthorize("hasAuthority('storage.delete')")
     public ResponseEntity<Void> deleteLocation(@PathVariable Long locationId) {
         storageService.deleteLocation(locationId);
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/units/{unitId}")
+    @PreAuthorize("hasAuthority('storage.delete')")
     public ResponseEntity<Void> deleteUnit(@PathVariable Long unitId) {
         storageService.deleteUnit(unitId);
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/containers/{containerId}")
+    @PreAuthorize("hasAuthority('storage.delete')")
     public ResponseEntity<Void> deleteContainer(@PathVariable Long containerId) {
         storageService.deleteContainer(containerId);
         return ResponseEntity.noContent().build();

@@ -15,6 +15,7 @@
           <h3>Локации</h3>
           <div class="action-buttons">
             <button
+              v-if="canCreate"
               class="icon-button"
               title="Добавить"
               aria-label="Добавить"
@@ -25,6 +26,7 @@
               </svg>
             </button>
             <button
+              v-if="canUpdate"
               class="icon-button"
               title="Обновить"
               aria-label="Обновить"
@@ -39,6 +41,7 @@
               </svg>
             </button>
             <button
+              v-if="canDelete"
               class="icon-button danger"
               title="Удалить"
               aria-label="Удалить"
@@ -112,6 +115,7 @@
                 <div class="action-buttons">
                   <button
                     class="icon-button"
+                    v-if="canCreate"
                     title="Добавить"
                     aria-label="Добавить"
                     @click="openUnitModal"
@@ -124,6 +128,7 @@
                     </svg>
                   </button>
                   <button
+                    v-if="canUpdate"
                     class="icon-button"
                     title="Обновить"
                     aria-label="Обновить"
@@ -138,6 +143,7 @@
                     </svg>
                   </button>
                   <button
+                    v-if="canDelete"
                     class="icon-button danger"
                     title="Удалить"
                     aria-label="Удалить"
@@ -180,6 +186,7 @@
                       <h5>Полки</h5>
                       <div class="action-buttons">
                         <button
+                          v-if="canCreate"
                           class="icon-button"
                           title="Добавить"
                           aria-label="Добавить"
@@ -193,6 +200,7 @@
                           </svg>
                         </button>
                         <button
+                          v-if="canUpdate"
                           class="icon-button"
                           title="Обновить"
                           aria-label="Обновить"
@@ -207,6 +215,7 @@
                           </svg>
                         </button>
                         <button
+                          v-if="canDelete"
                           class="icon-button danger"
                           title="Удалить"
                           aria-label="Удалить"
@@ -1121,9 +1130,11 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { defineComponent, computed } from "vue";
+import { useStore } from "vuex";
 import axios from "axios";
 import BarcodeSvg from "@/components/BarcodeSvg.vue";
+import { getExpiryStatusCode, getExpiryStatusLabel } from "@/utils/expiryUtils";
 
 interface StorageContainer {
   containerId: number;
@@ -1261,6 +1272,14 @@ export default defineComponent({
   name: "StorageView",
   components: {
     BarcodeSvg,
+  },
+  setup() {
+    const store = useStore();
+    return {
+      canCreate: computed(() => store.getters.hasPermission("storage.create")),
+      canUpdate: computed(() => store.getters.hasPermission("storage.update")),
+      canDelete: computed(() => store.getters.hasPermission("storage.delete")),
+    };
   },
   data() {
     return {
@@ -1521,8 +1540,8 @@ export default defineComponent({
       return this.calculateActualMonths(this.drawerSampleForm.collectionDate);
     },
     drawerExpiryPreview(): string {
-      return this.getExpiryStatusLabel(
-        this.getExpiryStatusCode(
+      return getExpiryStatusLabel(
+        getExpiryStatusCode(
           this.drawerSampleForm.collectionDate,
           this.drawerSampleForm.recommendedStorageMonths
         )
@@ -1950,40 +1969,8 @@ export default defineComponent({
       const now = new Date();
       return new Date(now.getFullYear(), now.getMonth(), now.getDate());
     },
-    getExpiryStatusCode(
-      collectionDate: string | null | undefined,
-      recommendedMonths: number | null | undefined
-    ) {
-      if (!recommendedMonths) {
-        return "GREEN";
-      }
-      const startDate = this.getDateOnly(collectionDate);
-      if (!startDate) {
-        return "GREEN";
-      }
-      const expiryDate = this.addMonthsClamped(startDate, recommendedMonths);
-      const today = this.getTodayDateOnly();
-      if (!today) {
-        return "GREEN";
-      }
-      if (today > expiryDate) {
-        return "RED";
-      }
-      let remainingMonths =
-        (expiryDate.getFullYear() - today.getFullYear()) * 12 +
-        (expiryDate.getMonth() - today.getMonth());
-      if (today.getDate() > expiryDate.getDate()) {
-        remainingMonths -= 1;
-      }
-      return remainingMonths <= 2 ? "YELLOW" : "GREEN";
-    },
-    getExpiryStatusLabel(status: string) {
-      if (status === "RED") return "Просрочен";
-      if (status === "YELLOW") return "Истекает";
-      return "Годен";
-    },
     getSampleExpiryStatus(sample: Sample) {
-      return this.getExpiryStatusCode(
+      return getExpiryStatusCode(
         sample.createdAtSample,
         sample.recommendedStorageMonths
       );
@@ -2103,7 +2090,7 @@ export default defineComponent({
         return this.getSampleStatusName(specimen.sampleStatusId);
       }
       if (key === "expiryStatus") {
-        return this.getExpiryStatusLabel(this.getSampleExpiryStatus(sample));
+        return getExpiryStatusLabel(this.getSampleExpiryStatus(sample));
       }
       if (key === "researchInfo") {
         const visit = this.getVisitById(sample.visitId);
@@ -2192,7 +2179,6 @@ export default defineComponent({
         this.drawerSampleForm.specimens = [];
         return;
       }
-      const baseBarcode = this.drawerSampleForm.barcode || "";
       const current = [...(this.drawerSampleForm.specimens || [])];
       const result = [];
       for (let i = 0; i < quantity; i += 1) {
@@ -2200,7 +2186,7 @@ export default defineComponent({
           result.push(current[i]);
         } else {
           result.push({
-            barcode: baseBarcode ? `${baseBarcode}-${i + 1}` : "",
+            barcode: "",
             sampleStatusId: this.getStorageStatusId(),
             containerId:
               this.drawerSampleForm.containerId ??
@@ -2236,12 +2222,8 @@ export default defineComponent({
         });
       });
       (this.drawerSampleForm.specimens || []).forEach((a, idx) => {
-        if (
-          idx !== currentIndex &&
-          a.containerId === containerId &&
-          a.positionInContainer
-        ) {
-          occupied.add(a.positionInContainer);
+        if (idx !== currentIndex && a.positionInContainer?.trim()) {
+          occupied.add(a.positionInContainer.trim());
         }
       });
       return Array.from({ length: layout.total }, (_, i) => {

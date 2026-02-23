@@ -2,11 +2,6 @@ spring:
   application:
     name: biobank-backend
   
-  # Отключаем Spring Security полностью на время разработки
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
-      - org.springframework.boot.actuator.autoconfigure.security.servlet.ManagementWebSecurityAutoConfiguration
   
   datasource:
     url: jdbc:postgresql://localhost:5432/biobank
@@ -43,6 +38,10 @@ spring:
       allowed-methods: "*"
       allowed-headers: "*"
       allow-credentials: true
+
+jwt:
+  secret: ${JWT_SECRET:biobank-secret-key-change-in-production-min-256-bits}
+  expiration-ms: 86400000  # 24 часа
 
 server:
   port: 8080

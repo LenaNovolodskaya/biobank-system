@@ -3,6 +3,7 @@
     <div class="page-header">
       <h2>Образцы</h2>
       <button
+        v-if="canCreate"
         class="icon-button header-button"
         type="button"
         @click="openCreateModal"
@@ -337,6 +338,7 @@
                 </td>
                 <td class="action-col">
                   <button
+                    v-if="canUpdate"
                     class="icon-button"
                     type="button"
                     aria-label="Обновить"
@@ -353,6 +355,7 @@
                 </td>
                 <td class="action-col">
                   <button
+                    v-if="canDelete"
                     class="icon-button danger"
                     type="button"
                     aria-label="Удалить"
@@ -373,7 +376,7 @@
                 class="specimens-details-row"
               >
                 <td :colspan="visibleColumns.length + 2" class="specimens-cell">
-                  <div class="specimens-header">Образцы:</div>
+                  <div class="specimens-header">Пробы:</div>
                   <div
                     v-if="getSampleSpecimens(sample).length === 0"
                     class="specimens-empty"
@@ -533,14 +536,14 @@
             </select>
           </div>
           <div class="form-group specimens-form-group">
-            <label>Образцы</label>
+            <label>Пробы</label>
             <div v-if="tubeCount > 0" class="specimens-form-grid">
               <div
                 v-for="(specimen, index) in modalSample.specimens"
                 :key="index"
                 class="specimen-form-row"
               >
-                <div class="specimen-form-label">Образец {{ index + 1 }}</div>
+                <div class="specimen-form-label">Проба {{ index + 1 }}</div>
                 <input
                   v-model="specimen.barcode"
                   type="text"
@@ -581,7 +584,7 @@
               </div>
             </div>
             <div v-else class="readonly-field">
-              Укажите начальное количество проб.
+              Укажите начальное количество проб
             </div>
           </div>
           <div class="form-actions">
@@ -596,9 +599,11 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { defineComponent, computed } from "vue";
+import { useStore } from "vuex";
 import axios from "axios";
 import BarcodeSvg from "@/components/BarcodeSvg.vue";
+import { getExpiryStatusCode, getExpiryStatusLabel } from "@/utils/expiryUtils";
 
 interface Specimen {
   specimenId: number;
@@ -755,6 +760,14 @@ export default defineComponent({
   name: "SampleList",
   components: {
     BarcodeSvg,
+  },
+  setup() {
+    const store = useStore();
+    return {
+      canCreate: computed(() => store.getters.hasPermission("sample.create")),
+      canUpdate: computed(() => store.getters.hasPermission("sample.update")),
+      canDelete: computed(() => store.getters.hasPermission("sample.delete")),
+    };
   },
   data() {
     return {
@@ -961,8 +974,8 @@ export default defineComponent({
       return this.calculateActualMonths(this.modalSample.collectionDate);
     },
     expiryPreview(): string {
-      return this.getExpiryStatusLabel(
-        this.getExpiryStatusCode(
+      return getExpiryStatusLabel(
+        getExpiryStatusCode(
           this.modalSample.collectionDate,
           this.modalSample.recommendedStorageMonths
         )
@@ -1160,7 +1173,6 @@ export default defineComponent({
         this.modalSample.specimens = [];
         return;
       }
-      const baseBarcode = this.modalSample.barcode || "";
       const existing = [...current];
       const result: SpecimenFormItem[] = [];
       for (let i = 0; i < quantity; i += 1) {
@@ -1168,7 +1180,7 @@ export default defineComponent({
           result.push(existing[i]);
         } else {
           result.push({
-            barcode: baseBarcode ? `${baseBarcode}-${i + 1}` : "",
+            barcode: "",
             sampleStatusId: this.getStorageStatusId(),
             containerId: this.modalSample.containerId,
             positionInContainer: "",
@@ -1201,12 +1213,8 @@ export default defineComponent({
         });
       });
       this.modalSample.specimens.forEach((a, idx) => {
-        if (
-          idx !== currentIndex &&
-          a.containerId === containerId &&
-          a.positionInContainer
-        ) {
-          occupied.add(a.positionInContainer);
+        if (idx !== currentIndex && a.positionInContainer?.trim()) {
+          occupied.add(a.positionInContainer.trim());
         }
       });
       const getPositionLabel = (
@@ -1660,40 +1668,8 @@ export default defineComponent({
       );
       return status?.sampleStatusName || "—";
     },
-    getExpiryStatusCode(
-      collectionDate: string | null | undefined,
-      recommendedMonths: number | null | undefined
-    ) {
-      if (!recommendedMonths) {
-        return "GREEN";
-      }
-      const startDate = this.getDateOnly(collectionDate);
-      if (!startDate) {
-        return "GREEN";
-      }
-      const expiryDate = this.addMonthsClamped(startDate, recommendedMonths);
-      const today = this.getTodayDateOnly();
-      if (!today) {
-        return "GREEN";
-      }
-      if (today > expiryDate) {
-        return "RED";
-      }
-      let remainingMonths =
-        (expiryDate.getFullYear() - today.getFullYear()) * 12 +
-        (expiryDate.getMonth() - today.getMonth());
-      if (today.getDate() > expiryDate.getDate()) {
-        remainingMonths -= 1;
-      }
-      return remainingMonths < 2 ? "YELLOW" : "GREEN";
-    },
-    getExpiryStatusLabel(status: string) {
-      if (status === "RED") return "Просрочен";
-      if (status === "YELLOW") return "Истекает";
-      return "Годен";
-    },
     getSampleExpiryStatus(sample: Sample) {
-      return this.getExpiryStatusCode(
+      return getExpiryStatusCode(
         sample.createdAtSample,
         sample.recommendedStorageMonths
       );
@@ -1770,7 +1746,7 @@ export default defineComponent({
     },
     formatValue(sample: Sample, key: string) {
       if (key === "expiryStatus") {
-        return this.getExpiryStatusLabel(this.getSampleExpiryStatus(sample));
+        return getExpiryStatusLabel(this.getSampleExpiryStatus(sample));
       }
       if (key === "researchInfo") {
         const visit = this.getVisitById(sample.visitId);

@@ -3,6 +3,7 @@
     <div class="page-header">
       <h2>Пациенты</h2>
       <button
+        v-if="canCreate"
         class="icon-button header-button"
         type="button"
         @click="openCreateModal"
@@ -34,8 +35,9 @@
         :class="{ selected: patient.patientId === selectedPatientId }"
         @click="selectPatient(patient.patientId)"
       >
-        <div class="card-action-buttons">
+        <div class="card-action-buttons" v-if="canUpdate || canDelete">
           <button
+            v-if="canUpdate"
             class="icon-button"
             type="button"
             aria-label="Обновить"
@@ -50,6 +52,7 @@
             </svg>
           </button>
           <button
+            v-if="canDelete"
             class="icon-button danger"
             type="button"
             aria-label="Удалить"
@@ -464,7 +467,8 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { defineComponent, computed } from "vue";
+import { useStore } from "vuex";
 import axios from "axios";
 import BarcodeSvg from "@/components/BarcodeSvg.vue";
 
@@ -507,6 +511,14 @@ export default defineComponent({
   name: "PatientList",
   components: {
     BarcodeSvg,
+  },
+  setup() {
+    const store = useStore();
+    return {
+      canCreate: computed(() => store.getters.hasPermission("patient.create")),
+      canUpdate: computed(() => store.getters.hasPermission("patient.update")),
+      canDelete: computed(() => store.getters.hasPermission("patient.delete")),
+    };
   },
   data() {
     return {

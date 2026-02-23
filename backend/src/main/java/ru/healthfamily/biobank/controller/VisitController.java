@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
 import ru.healthfamily.biobank.dto.CreateVisitRequest;
 import ru.healthfamily.biobank.dto.VisitDTO;
@@ -25,11 +26,13 @@ public class VisitController {
     private final VisitService visitService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('visit.view')")
     public ResponseEntity<List<VisitDTO>> getAllVisits() {
         return ResponseEntity.ok(visitService.getAllVisits());
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('visit.create')")
     public ResponseEntity<VisitDTO> createVisit(
             @Valid @RequestBody CreateVisitRequest request) {
         VisitDTO visit = visitService.createVisit(request);
@@ -37,6 +40,7 @@ public class VisitController {
     }
 
     @PutMapping("/{visitId}")
+    @PreAuthorize("hasAuthority('visit.update')")
     public ResponseEntity<VisitDTO> updateVisit(
             @PathVariable Long visitId,
             @Valid @RequestBody CreateVisitRequest request) {
@@ -44,6 +48,7 @@ public class VisitController {
     }
 
     @DeleteMapping("/{visitId}")
+    @PreAuthorize("hasAuthority('visit.delete')")
     public ResponseEntity<Void> deleteVisit(@PathVariable Long visitId) {
         visitService.deleteVisit(visitId);
         return ResponseEntity.noContent().build();

@@ -1,6 +1,6 @@
 <template>
   <div id="app">
-    <nav class="navbar">
+    <nav class="navbar" v-if="isAuthenticated">
       <div class="nav-brand">Система учёта биообразцов</div>
       <ul class="nav-links">
         <li><router-link to="/samples">Образцы</router-link></li>
@@ -8,8 +8,13 @@
         <li><router-link to="/researches">Исследования</router-link></li>
         <li><router-link to="/visits">Визиты</router-link></li>
         <li><router-link to="/patients">Пациенты</router-link></li>
-        <!--<li><router-link to="/references">Справочники</router-link></li>-->
       </ul>
+      <div class="nav-user">
+        <router-link class="btn btn-secondary btn-sm" to="/profile">
+          Профиль
+        </router-link>
+        <button class="btn btn-secondary btn-sm" @click="logout">Выйти</button>
+      </div>
     </nav>
 
     <main class="main-content">
@@ -19,14 +24,27 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { defineComponent, computed } from "vue";
 import { RouterLink, RouterView } from "vue-router";
+import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 
 export default defineComponent({
   name: "App",
   components: {
     RouterLink,
     RouterView,
+  },
+  setup() {
+    const store = useStore();
+    const router = useRouter();
+    return {
+      isAuthenticated: computed(() => store.getters.isAuthenticated),
+      logout: () => {
+        store.commit("clearAuth");
+        router.push("/login").catch(() => undefined);
+      },
+    };
   },
 });
 </script>
@@ -95,6 +113,20 @@ body {
   color: var(--surface);
 }
 
+.nav-user {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.user-name {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+.btn-sm {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+}
+
 .main-content {
   padding: 0.5rem 1.5rem;
   max-width: 98%;
@@ -108,8 +140,15 @@ body {
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
+  text-decoration: none;
   transition: background-color 0.25s ease, color 0.25s ease,
     box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn:disabled {

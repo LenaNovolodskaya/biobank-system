@@ -2,6 +2,7 @@ package ru.healthfamily.biobank.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import ru.healthfamily.biobank.model.ContainerTypeTemplate;
 import ru.healthfamily.biobank.model.Nationality;
@@ -40,12 +41,14 @@ public class ReferenceController {
     private final DiagnosisRepository diagnosisRepository;
     
     @GetMapping("/nationalities")
+    @PreAuthorize("hasAuthority('reference.view')")
     public ResponseEntity<List<Nationality>> getAllNationalities() {
         List<Nationality> nationalities = nationalityRepository.findAllByOrderByNationalityNameAsc();
         return ResponseEntity.ok(nationalities);
     }
 
     @PostMapping("/nationalities")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<Nationality> createNationality(@RequestBody Map<String, String> body) {
         String name = body.getOrDefault("name", "").trim();
         Nationality nationality = new Nationality();
@@ -54,6 +57,7 @@ public class ReferenceController {
     }
 
     @PutMapping("/nationalities/{id}")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<Nationality> updateNationality(
             @PathVariable Long id,
             @RequestBody Map<String, String> body
@@ -65,17 +69,20 @@ public class ReferenceController {
     }
 
     @DeleteMapping("/nationalities/{id}")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<Void> deleteNationality(@PathVariable Long id) {
         nationalityRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }
     
     @GetMapping("/container-templates")
+    @PreAuthorize("hasAuthority('reference.view')")
     public ResponseEntity<List<ContainerTypeTemplate>> getContainerTemplates() {
         return ResponseEntity.ok(containerTypeTemplateRepository.findAll());
     }
 
     @PostMapping("/container-templates")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<ContainerTypeTemplate> createContainerTemplate(@RequestBody java.util.Map<String, Object> body) {
         String name = String.valueOf(body.getOrDefault("templateName", "")).trim();
         if (name.isEmpty()) {
@@ -98,6 +105,7 @@ public class ReferenceController {
     }
 
     @PutMapping("/container-templates/{id}")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<ContainerTypeTemplate> updateContainerTemplate(
             @PathVariable Long id,
             @RequestBody java.util.Map<String, Object> body
@@ -124,23 +132,27 @@ public class ReferenceController {
     }
 
     @DeleteMapping("/container-templates/{id}")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<Void> deleteContainerTemplate(@PathVariable Long id) {
         containerTypeTemplateRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/genders")
+    @PreAuthorize("hasAuthority('reference.view')")
     public ResponseEntity<List<String>> getAllGenders() {
         List<String> genders = List.of("UNKNOWN", "MALE", "FEMALE");
         return ResponseEntity.ok(genders);
     }
 
     @GetMapping("/unit-types")
+    @PreAuthorize("hasAuthority('reference.view')")
     public ResponseEntity<List<UnitType>> getUnitTypes() {
         return ResponseEntity.ok(unitTypeRepository.findAll());
     }
 
     @PostMapping("/unit-types")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<UnitType> createUnitType(@RequestBody Map<String, String> body) {
         String name = body.getOrDefault("name", "").trim();
         UnitType unitType = new UnitType();
@@ -149,6 +161,7 @@ public class ReferenceController {
     }
 
     @PutMapping("/unit-types/{id}")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<UnitType> updateUnitType(
             @PathVariable Long id,
             @RequestBody Map<String, String> body
@@ -160,17 +173,20 @@ public class ReferenceController {
     }
 
     @DeleteMapping("/unit-types/{id}")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<Void> deleteUnitType(@PathVariable Long id) {
         unitTypeRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/sample-types")
+    @PreAuthorize("hasAuthority('reference.view')")
     public ResponseEntity<List<SampleType>> getSampleTypes() {
         return ResponseEntity.ok(sampleTypeRepository.findAll());
     }
 
     @PostMapping("/sample-types")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<SampleType> createSampleType(@RequestBody Map<String, String> body) {
         String name = body.getOrDefault("name", "").trim();
         String iconPath = body.getOrDefault("iconPath", "").trim();
@@ -181,6 +197,7 @@ public class ReferenceController {
     }
 
     @PutMapping("/sample-types/{id}")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<SampleType> updateSampleType(
             @PathVariable Long id,
             @RequestBody Map<String, String> body
@@ -193,22 +210,26 @@ public class ReferenceController {
     }
 
     @DeleteMapping("/sample-types/{id}")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<Void> deleteSampleType(@PathVariable Long id) {
         sampleTypeRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/sample-statuses")
+    @PreAuthorize("hasAuthority('reference.view')")
     public ResponseEntity<List<SampleStatus>> getSampleStatuses() {
         return ResponseEntity.ok(sampleStatusRepository.findAll());
     }
 
     @GetMapping("/research-groups")
+    @PreAuthorize("hasAuthority('reference.view')")
     public ResponseEntity<List<ResearchGroup>> getResearchGroups() {
         return ResponseEntity.ok(researchGroupRepository.findAll());
     }
 
     @PostMapping("/research-groups")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<ResearchGroup> createResearchGroup(@RequestBody Map<String, String> body) {
         String name = body.getOrDefault("name", "").trim();
         ResearchGroup group = new ResearchGroup();
@@ -217,6 +238,7 @@ public class ReferenceController {
     }
 
     @PutMapping("/research-groups/{id}")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<ResearchGroup> updateResearchGroup(
             @PathVariable Long id,
             @RequestBody Map<String, String> body
@@ -228,17 +250,20 @@ public class ReferenceController {
     }
 
     @DeleteMapping("/research-groups/{id}")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<Void> deleteResearchGroup(@PathVariable Long id) {
         researchGroupRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/financing-sources")
+    @PreAuthorize("hasAuthority('reference.view')")
     public ResponseEntity<List<FinancingSource>> getFinancingSources() {
         return ResponseEntity.ok(financingSourceRepository.findAll());
     }
 
     @PostMapping("/financing-sources")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<FinancingSource> createFinancingSource(@RequestBody Map<String, String> body) {
         String name = body.getOrDefault("name", "").trim();
         FinancingSource source = new FinancingSource();
@@ -247,6 +272,7 @@ public class ReferenceController {
     }
 
     @PutMapping("/financing-sources/{id}")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<FinancingSource> updateFinancingSource(
             @PathVariable Long id,
             @RequestBody Map<String, String> body
@@ -258,17 +284,20 @@ public class ReferenceController {
     }
 
     @DeleteMapping("/financing-sources/{id}")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<Void> deleteFinancingSource(@PathVariable Long id) {
         financingSourceRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/departments")
+    @PreAuthorize("hasAuthority('reference.view')")
     public ResponseEntity<List<Department>> getDepartments() {
         return ResponseEntity.ok(departmentRepository.findAll());
     }
 
     @PostMapping("/departments")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<Department> createDepartment(@RequestBody Map<String, String> body) {
         String name = body.getOrDefault("name", "").trim();
         Department department = new Department();
@@ -277,6 +306,7 @@ public class ReferenceController {
     }
 
     @PutMapping("/departments/{id}")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<Department> updateDepartment(
             @PathVariable Long id,
             @RequestBody Map<String, String> body
@@ -288,17 +318,20 @@ public class ReferenceController {
     }
 
     @DeleteMapping("/departments/{id}")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<Void> deleteDepartment(@PathVariable Long id) {
         departmentRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/diagnoses")
+    @PreAuthorize("hasAuthority('reference.view')")
     public ResponseEntity<List<Diagnosis>> getDiagnoses() {
         return ResponseEntity.ok(diagnosisRepository.findAll());
     }
 
     @PostMapping("/diagnoses")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<Diagnosis> createDiagnosis(@RequestBody Map<String, String> body) {
         Diagnosis diagnosis = new Diagnosis();
         diagnosis.setIcd10Code(body.getOrDefault("icd10Code", "").trim());
@@ -307,6 +340,7 @@ public class ReferenceController {
     }
 
     @PutMapping("/diagnoses/{id}")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<Diagnosis> updateDiagnosis(
             @PathVariable Long id,
             @RequestBody Map<String, String> body
@@ -319,6 +353,7 @@ public class ReferenceController {
     }
 
     @DeleteMapping("/diagnoses/{id}")
+    @PreAuthorize("hasAuthority('reference.manage')")
     public ResponseEntity<Void> deleteDiagnosis(@PathVariable Long id) {
         diagnosisRepository.deleteById(id);
         return ResponseEntity.noContent().build();

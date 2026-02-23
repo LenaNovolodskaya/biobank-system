@@ -3,19 +3,22 @@ package ru.healthfamily.biobank.config;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-
 import java.util.Map;
 
-/**
- * Обработка исключений для возврата понятных сообщений клиенту.
- */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final String DUPLICATE_TEMPLATE_MSG = "Такой шаблон контейнера уже существует";
     private static final String TEMPLATE_IN_USE_MSG = "Шаблон нельзя удалить: он используется в контейнерах";
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<Map<String, String>> handleBadCredentials(BadCredentialsException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("message", "Неверное имя пользователя или пароль"));
+    }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleIllegalArgumentException(IllegalArgumentException ex) {

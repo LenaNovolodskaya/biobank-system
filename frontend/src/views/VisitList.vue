@@ -3,6 +3,7 @@
     <div class="page-header">
       <h2>Визиты</h2>
       <button
+        v-if="canCreate"
         class="icon-button header-button"
         type="button"
         @click="openCreateModal"
@@ -222,6 +223,7 @@
               </td>
               <td class="action-col">
                 <button
+                  v-if="canUpdate"
                   class="icon-button"
                   type="button"
                   aria-label="Обновить"
@@ -238,6 +240,7 @@
               </td>
               <td class="action-col">
                 <button
+                  v-if="canDelete"
                   class="icon-button danger"
                   type="button"
                   aria-label="Удалить"
@@ -452,7 +455,8 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { defineComponent, computed } from "vue";
+import { useStore } from "vuex";
 import axios from "axios";
 import BarcodeSvg from "@/components/BarcodeSvg.vue";
 
@@ -500,6 +504,14 @@ export default defineComponent({
   name: "VisitList",
   components: {
     BarcodeSvg,
+  },
+  setup() {
+    const store = useStore();
+    return {
+      canCreate: computed(() => store.getters.hasPermission("visit.create")),
+      canUpdate: computed(() => store.getters.hasPermission("visit.update")),
+      canDelete: computed(() => store.getters.hasPermission("visit.delete")),
+    };
   },
   data() {
     return {

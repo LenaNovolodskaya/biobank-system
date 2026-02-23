@@ -3,6 +3,7 @@
     <div class="page-header">
       <h2>Исследования</h2>
       <button
+        v-if="canCreate"
         class="icon-button header-button"
         type="button"
         @click="openCreateModal"
@@ -169,6 +170,7 @@
               <td class="active-col">{{ research.isActive ? "Да" : "Нет" }}</td>
               <td class="action-col">
                 <button
+                  v-if="canUpdate"
                   class="icon-button"
                   type="button"
                   aria-label="Обновить"
@@ -185,6 +187,7 @@
               </td>
               <td class="action-col">
                 <button
+                  v-if="canDelete"
                   class="icon-button danger"
                   type="button"
                   aria-label="Удалить"
@@ -468,7 +471,8 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { defineComponent, computed } from "vue";
+import { useStore } from "vuex";
 import axios from "axios";
 
 interface Research {
@@ -497,6 +501,14 @@ interface ReferenceItem {
 
 export default defineComponent({
   name: "ResearchList",
+  setup() {
+    const store = useStore();
+    return {
+      canCreate: computed(() => store.getters.hasPermission("research.create")),
+      canUpdate: computed(() => store.getters.hasPermission("research.update")),
+      canDelete: computed(() => store.getters.hasPermission("research.delete")),
+    };
+  },
   data() {
     return {
       researches: [] as Research[],

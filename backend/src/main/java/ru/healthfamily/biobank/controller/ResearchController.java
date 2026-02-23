@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
 import ru.healthfamily.biobank.dto.CreateResearchRequest;
 import ru.healthfamily.biobank.dto.ResearchDTO;
@@ -25,11 +26,13 @@ public class ResearchController {
     private final ResearchService researchService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('research.view')")
     public ResponseEntity<List<ResearchDTO>> getAllResearches() {
         return ResponseEntity.ok(researchService.getAllResearches());
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('research.create')")
     public ResponseEntity<ResearchDTO> createResearch(
             @Valid @RequestBody CreateResearchRequest request) {
         ResearchDTO research = researchService.createResearch(request);
@@ -37,6 +40,7 @@ public class ResearchController {
     }
 
     @PutMapping("/{researchId}")
+    @PreAuthorize("hasAuthority('research.update')")
     public ResponseEntity<ResearchDTO> updateResearch(
             @PathVariable Long researchId,
             @Valid @RequestBody CreateResearchRequest request) {
@@ -44,6 +48,7 @@ public class ResearchController {
     }
 
     @DeleteMapping("/{researchId}")
+    @PreAuthorize("hasAuthority('research.delete')")
     public ResponseEntity<Void> deleteResearch(@PathVariable Long researchId) {
         researchService.deleteResearch(researchId);
         return ResponseEntity.noContent().build();
