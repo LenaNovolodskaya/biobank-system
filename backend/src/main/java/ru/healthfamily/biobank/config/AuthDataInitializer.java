@@ -3,6 +3,7 @@ package ru.healthfamily.biobank.config;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 @Slf4j
+@Order(1)
 public class AuthDataInitializer implements CommandLineRunner {
 
     private final PermissionRepository permissionRepository;
@@ -35,37 +37,37 @@ public class AuthDataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
+        Role adminRole;
+
         if (permissionRepository.count() > 0) {
             log.debug("Данные авторизации уже инициализированы");
-            return;
+            adminRole = roleRepository.findByRoleName("Администратор").orElse(null);
+        } else {
+            log.info("Инициализация справочников авторизации...");
+
+            var permissions = createPermissions();
+            var permMap = permissionRepository.findAll().stream()
+                    .collect(Collectors.toMap(Permission::getPermissionName, p -> p));
+
+            createRole("Пользователь", Set.of(
+                    "patient.view", "visit.view", "sample.view", "research.view", "storage.view", "reference.view"
+            ), permMap);
+
+            adminRole = createRole("Администратор", permMap.keySet(), permMap);
+
+            createRole("Лаборант", Set.of(
+                    "patient.view", "patient.create", "patient.update",
+                    "visit.view", "visit.create", "visit.update",
+                    "sample.view", "sample.create", "sample.update",
+                    "research.view", "storage.view", "storage.create", "storage.update",
+                    "reference.view"
+            ), permMap);
+
+            log.info("Инициализация авторизации завершена");
         }
 
-        log.info("Инициализация справочников авторизации...");
-
-        // Разрешения
-        var permissions = createPermissions();
-        var permMap = permissionRepository.findAll().stream()
-                .collect(Collectors.toMap(Permission::getPermissionName, p -> p));
-
-        // Роль "Пользователь" - только просмотр
-        Role viewerRole = createRole("Пользователь", Set.of(
-                "patient.view", "visit.view", "sample.view", "research.view", "storage.view", "reference.view"
-        ), permMap);
-
-        // Роль "Администратор" - полный доступ
-        Role adminRole = createRole("Администратор", permMap.keySet(), permMap);
-
-        // Роль "Лаборант" - просмотр + создание/обновление образцов, справочники только для просмотра
-        Role labRole = createRole("Лаборант", Set.of(
-                "patient.view", "patient.create", "patient.update",
-                "visit.view", "visit.create", "visit.update",
-                "sample.view", "sample.create", "sample.update",
-                "research.view", "storage.view", "storage.create", "storage.update",
-                "reference.view"
-        ), permMap);
-
-        // Администратор по умолчанию
-        if (!userRepository.existsByUsername("admin")) {
+        // Всегда проверяем: если admin отсутствует — создаём (в т.ч. после удаления или при частичной инициализации)
+        if (!userRepository.existsByUsername("admin") && adminRole != null) {
             User admin = new User();
             admin.setUsername("admin");
             admin.setPassword(passwordEncoder.encode("admin123"));
@@ -75,8 +77,6 @@ public class AuthDataInitializer implements CommandLineRunner {
             userRepository.save(admin);
             log.info("Создан пользователь-администратор: admin / admin123");
         }
-
-        log.info("Инициализация авторизации завершена");
     }
 
     private Set<Permission> createPermissions() {
