@@ -77,8 +77,9 @@
         <p>
           <strong>Дата рождения:</strong> {{ formatDate(patient.birthDate) }}
         </p>
-        <p v-if="patient.nationalityName">
-          <strong>Национальность:</strong> {{ patient.nationalityName }}
+        <p>
+          <strong>Национальность:</strong>
+          {{ patient.nationalityName || "Не указано" }}
         </p>
         <p>
           <strong>Основной диагноз:</strong>
@@ -212,8 +213,12 @@
                   {{ nationality.nationalityName }}
                 </option>
               </select>
-              <div class="icon-actions">
+              <div
+                v-if="canCreateRef || canUpdateRef || canDeleteRef"
+                class="icon-actions"
+              >
                 <button
+                  v-if="canCreateRef"
                   type="button"
                   class="icon-button"
                   @click="openNationalityModal()"
@@ -224,6 +229,7 @@
                   </svg>
                 </button>
                 <button
+                  v-if="canUpdateRef"
                   type="button"
                   class="icon-button"
                   :disabled="!modalPatient.nationalityId"
@@ -238,6 +244,7 @@
                   </svg>
                 </button>
                 <button
+                  v-if="canDeleteRef"
                   type="button"
                   class="icon-button danger"
                   :disabled="!modalPatient.nationalityId"
@@ -272,8 +279,12 @@
                   {{ diagnosis.diagnosisName }}
                 </option>
               </select>
-              <div class="icon-actions">
+              <div
+                v-if="canCreateRef || canUpdateRef || canDeleteRef"
+                class="icon-actions"
+              >
                 <button
+                  v-if="canCreateRef"
                   type="button"
                   class="icon-button"
                   @click="openDiagnosisModal(null, 'main')"
@@ -284,6 +295,7 @@
                   </svg>
                 </button>
                 <button
+                  v-if="canUpdateRef"
                   type="button"
                   class="icon-button"
                   :disabled="!modalPatient.mainDiagnosisId"
@@ -300,6 +312,7 @@
                   </svg>
                 </button>
                 <button
+                  v-if="canDeleteRef"
                   type="button"
                   class="icon-button danger"
                   :disabled="!modalPatient.mainDiagnosisId"
@@ -334,8 +347,12 @@
                   {{ diagnosis.diagnosisName }}
                 </label>
               </div>
-              <div class="icon-actions">
+              <div
+                v-if="canCreateRef || canUpdateRef || canDeleteRef"
+                class="icon-actions"
+              >
                 <button
+                  v-if="canCreateRef"
                   type="button"
                   class="icon-button"
                   @click="openDiagnosisModal(null, 'comorbid')"
@@ -346,6 +363,7 @@
                   </svg>
                 </button>
                 <button
+                  v-if="canUpdateRef"
                   type="button"
                   class="icon-button"
                   :disabled="!getSingleComorbidDiagnosisId()"
@@ -362,6 +380,7 @@
                   </svg>
                 </button>
                 <button
+                  v-if="canDeleteRef"
                   type="button"
                   class="icon-button danger"
                   :disabled="!getSingleComorbidDiagnosisId()"
@@ -518,6 +537,21 @@ export default defineComponent({
       canCreate: computed(() => store.getters.hasPermission("patient.create")),
       canUpdate: computed(() => store.getters.hasPermission("patient.update")),
       canDelete: computed(() => store.getters.hasPermission("patient.delete")),
+      canCreateRef: computed(
+        () =>
+          store.getters.hasPermission("reference.create") ||
+          store.getters.hasPermission("reference.manage")
+      ),
+      canUpdateRef: computed(
+        () =>
+          store.getters.hasPermission("reference.update") ||
+          store.getters.hasPermission("reference.manage")
+      ),
+      canDeleteRef: computed(
+        () =>
+          store.getters.hasPermission("reference.delete") ||
+          store.getters.hasPermission("reference.manage")
+      ),
     };
   },
   data() {
@@ -1213,15 +1247,15 @@ h2 {
   border-radius: 12px;
   padding: 20px;
   width: min(860px, 100%);
-  max-height: calc(100vh - 120px);
+  max-height: 85vh;
   overflow: auto;
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
 }
 
 .form-modal {
-  min-height: 600px;
-  max-height: calc(100vh - 120px);
+  min-height: 50vh;
+  max-height: 85vh;
   overflow: auto;
 }
 

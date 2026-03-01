@@ -55,13 +55,13 @@ public class AuthDataInitializer implements CommandLineRunner {
         // Роль "Администратор" - полный доступ
         Role adminRole = createRole("Администратор", permMap.keySet(), permMap);
 
-        // Роль "Лаборант" - просмотр + создание/обновление образцов
+        // Роль "Лаборант" - просмотр + создание/обновление образцов, справочники только для просмотра
         Role labRole = createRole("Лаборант", Set.of(
                 "patient.view", "patient.create", "patient.update",
                 "visit.view", "visit.create", "visit.update",
                 "sample.view", "sample.create", "sample.update",
                 "research.view", "storage.view", "storage.create", "storage.update",
-                "reference.view", "reference.manage"
+                "reference.view"
         ), permMap);
 
         // Администратор по умолчанию
@@ -86,8 +86,9 @@ public class AuthDataInitializer implements CommandLineRunner {
                 "sample.view", "sample.create", "sample.update", "sample.delete",
                 "research.view", "research.create", "research.update", "research.delete",
                 "storage.view", "storage.create", "storage.update", "storage.delete",
-                "reference.view", "reference.manage",
-                "user.manage", "role.manage"
+                "reference.view", "reference.create", "reference.update", "reference.delete", "reference.manage",
+                "role.view", "role.create", "role.delete", "role.permissions.manage", "role.manage",
+                "user.view", "user.create", "user.delete", "user.permissions.manage", "user.roles.assign", "user.manage"
         );
         for (String name : names) {
             Permission p = new Permission();

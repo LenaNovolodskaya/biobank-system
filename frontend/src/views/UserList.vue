@@ -2,6 +2,18 @@
   <div class="user-page">
     <div class="page-header">
       <h2>Пользователи</h2>
+      <button
+        v-if="canCreate"
+        class="icon-button header-button"
+        type="button"
+        @click="openCreateModal"
+        aria-label="Добавить"
+        title="Добавить"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M11 5h2v14h-2zM5 11h14v2H5z" fill="currentColor" />
+        </svg>
+      </button>
     </div>
 
     <div v-if="error" class="alert alert-danger">{{ error }}</div>
@@ -16,28 +28,37 @@
           <thead>
             <tr>
               <th class="id-col">ID</th>
-              <th class="username-col">Имя пользователя</th>
-              <th>ФИО</th>
+              <th class="username-col">Логин</th>
+              <th class="fullName-col">ФИО</th>
               <th class="roles-col">Роли</th>
               <th class="active-col">Активен</th>
-              <th class="actions-col">Действия</th>
+              <th class="action-col"></th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="user in users" :key="user.userId">
-              <td class="mono">{{ user.userId }}</td>
-              <td class="mono">{{ user.username }}</td>
-              <td>{{ user.fullName }}</td>
+            <tr v-if="users.length === 0" class="empty-row">
+              <td colspan="6" class="empty-state">Нет пользователей</td>
+            </tr>
+            <tr
+              v-for="user in users"
+              :key="user.userId"
+              :class="{ selected: user.userId === selectedUserId }"
+              @click="openUserProfile(user.userId)"
+            >
+              <td class="id-col mono">{{ user.userId }}</td>
+              <td class="username-col mono">{{ user.username }}</td>
+              <td class="fullName-col wrap-cell">{{ user.fullName }}</td>
               <td class="roles-cell">
                 {{ (user.roleNames || []).join(", ") }}
               </td>
-              <td>{{ user.isActive ? "Да" : "Нет" }}</td>
-              <td>
+              <td class="active-col">{{ user.isActive ? "Да" : "Нет" }}</td>
+              <td class="action-col">
                 <button
-                  class="btn btn-secondary btn-sm"
-                  @click="openEditModal(user)"
+                  type="button"
+                  class="btn btn-secondary btn-sm view-profile-btn"
+                  @click.stop="openUserProfile(user.userId)"
                 >
-                  Редактировать
+                  Просмотр профиля
                 </button>
               </td>
             </tr>
@@ -143,11 +164,89 @@
         </form>
       </div>
     </div>
+
+    <div
+      v-if="showCreateModal"
+      class="modal-overlay"
+      @click.self="closeCreateModal"
+    >
+      <div class="modal form-modal">
+        <div class="modal-header">
+          <h3>Добавить пользователя</h3>
+          <button
+            class="btn btn-secondary"
+            type="button"
+            @click="closeCreateModal"
+          >
+            Закрыть
+          </button>
+        </div>
+        <form @submit.prevent="saveNewUser">
+          <div class="form-group">
+            <label>Логин</label>
+            <input
+              v-model="createForm.username"
+              type="text"
+              class="form-control"
+              required
+            />
+          </div>
+          <div class="form-group">
+            <label>Пароль</label>
+            <input
+              v-model="createForm.password"
+              type="password"
+              class="form-control"
+              required
+              minlength="6"
+            />
+          </div>
+          <div class="form-group">
+            <label>ФИО</label>
+            <input
+              v-model="createForm.fullName"
+              type="text"
+              class="form-control"
+              required
+            />
+          </div>
+          <div class="form-group full-width">
+            <label>Роли</label>
+            <div class="checkbox-grid checkbox-grid-3">
+              <label
+                v-for="role in roles"
+                :key="role.roleId"
+                class="checkbox-label"
+              >
+                <input
+                  type="checkbox"
+                  :value="role.roleId"
+                  v-model="createForm.roleIds"
+                />
+                {{ role.roleName }}
+              </label>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              @click="closeCreateModal"
+            >
+              Отмена
+            </button>
+            <button type="submit" class="btn btn-primary" :disabled="saving">
+              {{ saving ? "Создание..." : "Создать" }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { defineComponent, computed } from "vue";
 import axios from "axios";
 import { useStore } from "vuex";
 import { resolvePermissionLabel as resolvePermissionLabelFn } from "@/utils/permissionLabels";
@@ -183,6 +282,14 @@ export default defineComponent({
       loading: false,
       error: "" as string,
       showEditModal: false,
+      showCreateModal: false,
+      selectedUserId: null as number | null,
+      createForm: {
+        username: "",
+        password: "",
+        fullName: "",
+        roleIds: [] as number[],
+      },
       permissionsMatrix: [] as UserPermissionMatrixItem[],
       permissionSelection: {} as Record<number, boolean>,
       permLoading: false,
@@ -197,7 +304,14 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    return { store };
+    return {
+      store,
+      canCreate: computed(
+        () =>
+          store.getters.hasPermission("user.create") ||
+          store.getters.hasPermission("user.manage")
+      ),
+    };
   },
   async mounted() {
     await this.loadRoles();
@@ -206,6 +320,38 @@ export default defineComponent({
   methods: {
     resolvePermissionLabel(code: string, label?: string | null) {
       return resolvePermissionLabelFn(code, label);
+    },
+    selectUser(userId: number) {
+      this.selectedUserId = this.selectedUserId === userId ? null : userId;
+    },
+    openUserProfile(userId: number) {
+      this.$router.push(`/users/${userId}`).catch(() => undefined);
+    },
+    openCreateModal() {
+      this.createForm = {
+        username: "",
+        password: "",
+        fullName: "",
+        roleIds: [],
+      };
+      this.showCreateModal = true;
+    },
+    closeCreateModal() {
+      this.showCreateModal = false;
+    },
+    async saveNewUser() {
+      this.saving = true;
+      try {
+        await axios.post("/users", this.createForm);
+        this.closeCreateModal();
+        await this.loadUsers();
+      } catch (e: unknown) {
+        const msg = (e as { response?: { data?: { message?: string } } })
+          ?.response?.data?.message;
+        this.error = msg || "Ошибка создания пользователя";
+      } finally {
+        this.saving = false;
+      }
     },
     async loadUsers() {
       this.loading = true;
@@ -259,6 +405,7 @@ export default defineComponent({
       };
     },
     async openEditModal(user: User) {
+      this.selectedUserId = user.userId;
       const roleIds = this.roles
         .filter((r) => (user.roleNames || []).includes(r.roleName))
         .map((r) => r.roleId);
@@ -322,11 +469,29 @@ export default defineComponent({
 </script>
 
 <style scoped>
+.user-page {
+  max-width: 98%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
 .page-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.75rem;
+  justify-content: center;
+  gap: 12px;
+}
+.page-header h2 {
+  text-align: center;
+  margin: 0;
+}
+.card {
+  background-color: var(--surface);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
 }
 .table-wrapper {
   width: 100%;
@@ -338,47 +503,105 @@ export default defineComponent({
 .user-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 760px;
+  table-layout: fixed;
+  font-size: 0.95rem;
 }
 .user-table th,
 .user-table td {
-  padding: 0.85rem 1rem;
+  padding: 10px;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
+  text-align: left;
+  white-space: normal;
+  word-break: break-word;
 }
 .user-table th {
-  background: var(--surface);
-  text-align: left;
+  color: var(--text-primary);
+  background-color: #f0e9df;
   font-weight: 700;
-  position: sticky;
-  top: 0;
-  z-index: 1;
 }
-.user-table tbody tr:hover {
-  background: rgba(216, 205, 189, 0.35);
+.user-table td {
+  white-space: pre-line;
+}
+.user-table tr.selected {
+  background-color: #cfc1ad;
 }
 .mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     "Liberation Mono", "Courier New", monospace;
 }
+.wrap-cell {
+  white-space: normal;
+}
 .roles-cell {
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+.user-table .id-col {
+  width: 6%;
+  max-width: 6%;
+}
+.user-table .username-col {
+  width: 14%;
+  max-width: 14%;
+}
+.user-table .fullName-col {
+  width: 22%;
+  max-width: 22%;
+}
+.user-table .roles-col {
+  width: 28%;
+  max-width: 28%;
+}
+.user-table .active-col {
+  width: 10%;
+  max-width: 10%;
+}
+.user-table th.action-col,
+.user-table td.action-col {
+  width: 20%;
+  max-width: 20%;
+  text-align: center;
+}
+.view-profile-btn {
+  white-space: nowrap;
+}
+
+.empty-state {
+  padding: 16px;
+  background-color: #ddd1c4;
+  border-radius: 8px;
   color: var(--text-secondary);
-  font-size: 0.92rem;
 }
-.id-col {
-  width: 80px;
+
+.header-button {
+  width: 36px;
+  height: 36px;
 }
-.active-col {
-  width: 110px;
+.icon-button {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #d8c9b6;
+  color: var(--text-secondary);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
-.actions-col {
-  width: 160px;
+.icon-button svg {
+  width: 18px;
+  height: 18px;
 }
-.username-col {
-  width: 180px;
+.icon-button:hover:not(:disabled) {
+  background: #cfc1ad;
+  color: var(--text-primary);
+  transform: translateY(-1px);
 }
-.roles-col {
-  width: 220px;
+.icon-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .modal-overlay {
@@ -396,7 +619,7 @@ export default defineComponent({
   box-shadow: var(--shadow);
   min-width: 720px;
   max-width: min(980px, calc(100vw - 48px));
-  max-height: calc(100vh - 120px);
+  max-height: 85vh;
   overflow: auto;
   padding: 1.25rem;
 }
@@ -442,6 +665,9 @@ export default defineComponent({
   display: grid;
   grid-template-columns: repeat(2, minmax(220px, 1fr));
   gap: 0.5rem 1rem;
+}
+.checkbox-grid-3 {
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
 }
 .checkbox-label {
   display: flex;

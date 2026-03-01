@@ -25,10 +25,23 @@ export const PERMISSION_LABELS: Record<string, string> = {
   "storage.delete": "Удаление элементов хранилища",
 
   "reference.view": "Просмотр справочников",
-  "reference.manage": "Редактирование справочников",
+  "reference.create": "Добавление записей в справочники",
+  "reference.update": "Редактирование записей справочников",
+  "reference.delete": "Удаление записей справочников",
+  "reference.manage": "Полное управление справочниками",
 
-  "user.manage": "Управление пользователями",
-  "role.manage": "Управление ролями и правами",
+  "role.view": "Просмотр ролей",
+  "role.create": "Добавление ролей",
+  "role.delete": "Удаление ролей",
+  "role.permissions.manage": "Настройка разрешений ролей",
+  "role.manage": "Полное управление ролями",
+
+  "user.view": "Просмотр пользователей",
+  "user.create": "Добавление пользователей",
+  "user.delete": "Удаление пользователей",
+  "user.permissions.manage": "Настройка разрешений пользователей",
+  "user.roles.assign": "Выдача ролей пользователям",
+  "user.manage": "Полное управление пользователями",
 };
 
 export function resolvePermissionLabel(code: string, label?: string | null) {

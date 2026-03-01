@@ -21,4 +21,7 @@ public class CreateStorageContainerRequest {
 
     /** Номер полки (только цифра) */
     private Integer shelfNumber;
+
+    /** Позиция на полке (порядок). null = по container_number */
+    private Integer shelfPosition;
 }

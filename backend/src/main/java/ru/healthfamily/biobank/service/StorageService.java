@@ -68,6 +68,17 @@ public class StorageService {
         container.setContainerNumber(request.getContainerNumber());
         container.setShelfNumber(request.getShelfNumber());
         container.setCurrentSamplesCount(0);
+        Integer shelfPos = request.getShelfPosition();
+        if (shelfPos == null) {
+            int maxPos = unit.getContainers().stream()
+                    .filter(c -> java.util.Objects.equals(c.getShelfNumber(), request.getShelfNumber()))
+                    .mapToInt(c -> c.getShelfPosition() != null ? c.getShelfPosition() : 0)
+                    .max()
+                    .orElse(0);
+            container.setShelfPosition(maxPos + 1);
+        } else {
+            container.setShelfPosition(shelfPos);
+        }
         return convertContainerToDTO(containerRepository.save(container));
     }
 
@@ -150,6 +161,7 @@ public class StorageService {
         container.setTemplate(template);
         container.setContainerNumber(request.getContainerNumber());
         container.setShelfNumber(request.getShelfNumber());
+        container.setShelfPosition(request.getShelfPosition());
         return convertContainerToDTO(containerRepository.save(container));
     }
 
@@ -211,6 +223,7 @@ public class StorageService {
                 container.getCurrentSamplesCount(),
                 container.getUnit().getUnitId(),
                 container.getShelfNumber(),
+                container.getShelfPosition(),
                 t.getTemplateId(),
                 t.getTemplateName(),
                 t.getRowsCount(),

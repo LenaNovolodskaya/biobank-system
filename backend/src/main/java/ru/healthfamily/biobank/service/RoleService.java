@@ -21,6 +21,7 @@ public class RoleService {
 
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
+    private final ru.healthfamily.biobank.repository.UserRepository userRepository;
 
     public List<RoleDTO> getAllRoles() {
         return roleRepository.findAll().stream()
@@ -51,6 +52,20 @@ public class RoleService {
         }
 
         return toRoleDTO(roleRepository.save(role));
+    }
+
+    @Transactional
+    public void deleteRole(Long roleId) {
+        Role role = roleRepository.findById(roleId)
+                .orElseThrow(() -> new IllegalArgumentException("Роль не найдена: " + roleId));
+        userRepository.findAll().forEach(u -> {
+            if (u.getRoles().removeIf(r -> r.getRoleId().equals(roleId))) {
+                userRepository.save(u);
+            }
+        });
+        role.getPermissions().clear();
+        roleRepository.save(role);
+        roleRepository.delete(role);
     }
 
     @Transactional

@@ -1,9 +1,9 @@
 /**
  * Расчёт статуса срока хранения образца.
- * remainingMonths = рекомендуемый срок хранения − фактический срок хранения.
- * > 2 месяцев (включая 2 мес + дни): Годен (GREEN)
- * ≤ 2 месяцев (ровно 2 мес или меньше): Истекает (YELLOW)
- * Истёк: Просрочен (RED)
+ * remaining = рекомендованный срок − фактический срок хранения.
+ * 1) Годен (GREEN): remaining > 2 месяцев
+ * 2) Истекает (YELLOW): 0 < remaining ≤ 2 месяцев
+ * 3) Просрочен (RED): фактический срок превышает рекомендованный (remaining ≤ 0)
  */
 
 export type ExpiryStatusCode = "GREEN" | "YELLOW" | "RED";
@@ -36,29 +36,29 @@ function addMonthsClamped(date: Date, monthsToAdd: number): Date {
  * Учитывает дни: 2 мес 4 дня = более 2 мес → Годен.
  * @param collectionDate - дата забора (ISO string)
  * @param recommendedMonths - рекомендуемый срок хранения в месяцах
+ * @param todayOverride - опционально: дата "сегодня" для тестов
  */
 export function getExpiryStatusCode(
   collectionDate: string | null | undefined,
-  recommendedMonths: number | null | undefined
+  recommendedMonths: number | null | undefined,
+  todayOverride?: Date
 ): ExpiryStatusCode {
   if (!recommendedMonths) return "GREEN";
   const startDate = getDateOnly(collectionDate);
   if (!startDate) return "GREEN";
   const expiryDate = addMonthsClamped(startDate, recommendedMonths);
-  const today = getTodayDateOnly();
+  const today = todayOverride
+    ? new Date(
+        todayOverride.getFullYear(),
+        todayOverride.getMonth(),
+        todayOverride.getDate()
+      )
+    : getTodayDateOnly();
   if (today > expiryDate) return "RED";
-  const remainingMonths =
-    (expiryDate.getFullYear() - today.getFullYear()) * 12 +
-    (expiryDate.getMonth() - today.getMonth());
-  const adjusted =
-    today.getDate() > expiryDate.getDate()
-      ? remainingMonths - 1
-      : remainingMonths;
-  if (adjusted <= 0) return "RED"; // Срок истёк
-  if (adjusted > 2) return "GREEN";
-  if (adjusted < 2) return "YELLOW";
-  // Ровно 2 полных месяца: если есть ещё дни до expiryDate — это "более 2 мес"
-  return today.getDate() < expiryDate.getDate() ? "GREEN" : "YELLOW";
+  // remaining > 2 месяцев → Годен. Сравниваем expiryDate с (today + 2 мес)
+  const twoMonthsFromToday = addMonthsClamped(today, 2);
+  if (expiryDate > twoMonthsFromToday) return "GREEN";
+  return "YELLOW";
 }
 
 export function getExpiryStatusLabel(status: ExpiryStatusCode): string {

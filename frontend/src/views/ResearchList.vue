@@ -255,8 +255,12 @@
                   {{ group.name }}
                 </option>
               </select>
-              <div class="icon-actions">
+              <div
+                v-if="canCreateRef || canUpdateRef || canDeleteRef"
+                class="icon-actions"
+              >
                 <button
+                  v-if="canCreateRef"
                   type="button"
                   class="icon-button"
                   @click="openRefModal('group')"
@@ -267,6 +271,7 @@
                   </svg>
                 </button>
                 <button
+                  v-if="canUpdateRef"
                   type="button"
                   class="icon-button"
                   :disabled="!modalResearch.researchGroupId"
@@ -281,6 +286,7 @@
                   </svg>
                 </button>
                 <button
+                  v-if="canDeleteRef"
                   type="button"
                   class="icon-button danger"
                   :disabled="!modalResearch.researchGroupId"
@@ -316,8 +322,12 @@
                   {{ source.name }}
                 </option>
               </select>
-              <div class="icon-actions">
+              <div
+                v-if="canCreateRef || canUpdateRef || canDeleteRef"
+                class="icon-actions"
+              >
                 <button
+                  v-if="canCreateRef"
                   type="button"
                   class="icon-button"
                   @click="openRefModal('financing')"
@@ -328,6 +338,7 @@
                   </svg>
                 </button>
                 <button
+                  v-if="canUpdateRef"
                   type="button"
                   class="icon-button"
                   :disabled="!modalResearch.financingSourceId"
@@ -344,6 +355,7 @@
                   </svg>
                 </button>
                 <button
+                  v-if="canDeleteRef"
                   type="button"
                   class="icon-button danger"
                   :disabled="!modalResearch.financingSourceId"
@@ -379,8 +391,12 @@
                   {{ department.name }}
                 </option>
               </select>
-              <div class="icon-actions">
+              <div
+                v-if="canCreateRef || canUpdateRef || canDeleteRef"
+                class="icon-actions"
+              >
                 <button
+                  v-if="canCreateRef"
                   type="button"
                   class="icon-button"
                   @click="openRefModal('department')"
@@ -391,6 +407,7 @@
                   </svg>
                 </button>
                 <button
+                  v-if="canUpdateRef"
                   type="button"
                   class="icon-button"
                   :disabled="!modalResearch.departmentId"
@@ -407,6 +424,7 @@
                   </svg>
                 </button>
                 <button
+                  v-if="canDeleteRef"
                   type="button"
                   class="icon-button danger"
                   :disabled="!modalResearch.departmentId"
@@ -437,6 +455,14 @@
             <button type="submit" class="btn btn-primary">
               {{ modalMode === "edit" ? "Обновить" : "Добавить" }}
             </button>
+            <button
+              v-if="modalMode === 'create'"
+              type="button"
+              class="btn btn-secondary"
+              @click="resetResearchForm"
+            >
+              Очистить
+            </button>
           </div>
         </form>
       </div>
@@ -462,6 +488,14 @@
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">
               {{ refModalMode === "edit" ? "Обновить" : "Добавить" }}
+            </button>
+            <button
+              v-if="refModalMode === 'create'"
+              type="button"
+              class="btn btn-secondary"
+              @click="resetRefModalForm"
+            >
+              Очистить
             </button>
           </div>
         </form>
@@ -507,6 +541,21 @@ export default defineComponent({
       canCreate: computed(() => store.getters.hasPermission("research.create")),
       canUpdate: computed(() => store.getters.hasPermission("research.update")),
       canDelete: computed(() => store.getters.hasPermission("research.delete")),
+      canCreateRef: computed(
+        () =>
+          store.getters.hasPermission("reference.create") ||
+          store.getters.hasPermission("reference.manage")
+      ),
+      canUpdateRef: computed(
+        () =>
+          store.getters.hasPermission("reference.update") ||
+          store.getters.hasPermission("reference.manage")
+      ),
+      canDeleteRef: computed(
+        () =>
+          store.getters.hasPermission("reference.delete") ||
+          store.getters.hasPermission("reference.manage")
+      ),
     };
   },
   data() {
@@ -687,6 +736,16 @@ export default defineComponent({
     closeModal() {
       this.modalOpen = false;
     },
+    resetResearchForm() {
+      this.modalResearch = {
+        researchNumber: "",
+        researchName: "",
+        researchGroupId: null,
+        financingSourceId: null,
+        departmentId: null,
+        isActive: true,
+      };
+    },
     async submitModal() {
       if (this.modalMode === "create") {
         await this.createResearch();
@@ -720,6 +779,9 @@ export default defineComponent({
     },
     closeRefModal() {
       this.refModalOpen = false;
+    },
+    resetRefModalForm() {
+      this.refModalName = "";
     },
     fillRefModalName() {
       const item = this.refModalItems.find(
@@ -1194,8 +1256,8 @@ h2 {
 }
 
 .form-modal {
-  min-height: 600px;
-  max-height: calc(100vh - 120px);
+  min-height: 50vh;
+  max-height: 85vh;
   overflow: auto;
 }
 

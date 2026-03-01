@@ -30,6 +30,10 @@ public class StorageContainer {
     @Column(name = "shelf_number")
     private Integer shelfNumber;
 
+    /** Позиция на полке (порядок отображения). null = сортировать по container_number */
+    @Column(name = "shelf_position")
+    private Integer shelfPosition;
+
     @ManyToOne(optional = false)
     @JoinColumn(name = "template_id", nullable = false)
     private ContainerTypeTemplate template;

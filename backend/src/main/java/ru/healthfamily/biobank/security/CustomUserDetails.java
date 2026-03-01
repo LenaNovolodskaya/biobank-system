@@ -69,11 +69,21 @@ public class CustomUserDetails implements UserDetails {
         return getEffectivePermissionNames();
     }
 
+    private static final Set<String> DEFAULT_VIEW_ONLY = Set.of(
+            "patient.view", "visit.view", "sample.view", "research.view",
+            "storage.view", "reference.view"
+    );
+
     private Set<String> getEffectivePermissionNames() {
         Set<String> inherited = user.getRoles().stream()
                 .flatMap(role -> role.getPermissions().stream()
                         .map(p -> p.getPermissionName()))
                 .collect(Collectors.toSet());
+
+        // Если у пользователя нет ролей — только просмотр (обычный пользователь)
+        if (inherited.isEmpty()) {
+            return new java.util.HashSet<>(DEFAULT_VIEW_ONLY);
+        }
 
         Map<String, Boolean> overrides = user.getPermissionOverrides().stream()
                 .collect(Collectors.toMap(

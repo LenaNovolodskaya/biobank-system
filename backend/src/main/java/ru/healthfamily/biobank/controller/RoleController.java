@@ -16,27 +16,37 @@ import java.util.List;
 @RestController
 @RequestMapping("/roles")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('role.manage')")
 public class RoleController {
 
     private final RoleService roleService;
 
     @GetMapping
+    @PreAuthorize("hasAnyAuthority('role.view','role.manage','user.view','user.manage','user.roles.assign')")
     public ResponseEntity<List<RoleDTO>> getAllRoles() {
         return ResponseEntity.ok(roleService.getAllRoles());
     }
 
     @GetMapping("/{roleId}")
+    @PreAuthorize("hasAnyAuthority('role.view','role.manage','user.roles.assign','user.manage')")
     public ResponseEntity<RoleDTO> getRoleById(@PathVariable Long roleId) {
         return ResponseEntity.ok(roleService.getRoleById(roleId));
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyAuthority('role.create','role.manage')")
     public ResponseEntity<RoleDTO> createRole(@Valid @RequestBody CreateRoleRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(roleService.createRole(request));
     }
 
+    @DeleteMapping("/{roleId}")
+    @PreAuthorize("hasAnyAuthority('role.delete','role.manage')")
+    public ResponseEntity<Void> deleteRole(@PathVariable Long roleId) {
+        roleService.deleteRole(roleId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/{roleId}/permissions")
+    @PreAuthorize("hasAnyAuthority('role.permissions.manage','role.manage')")
     public ResponseEntity<RoleDTO> updateRolePermissions(
             @PathVariable Long roleId,
             @Valid @RequestBody UpdateRolePermissionsRequest request

@@ -13,6 +13,7 @@ public class StorageContainerDTO {
     private Integer currentSamplesCount;
     private Long unitId;
     private Integer shelfNumber;
+    private Integer shelfPosition;
     private Long templateId;
     private String templateName;
     private Integer rowsCount;

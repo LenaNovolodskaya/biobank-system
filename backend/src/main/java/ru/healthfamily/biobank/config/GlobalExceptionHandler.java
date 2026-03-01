@@ -40,6 +40,10 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
         String msg = ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage();
         if (msg != null) {
+            if (msg.contains("uk_user_permission_override") || msg.contains("user_permission_override")) {
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                        .body(Map.of("message", "Дублирование разрешения для пользователя"));
+            }
             if (msg.contains("duplicate") || msg.contains("23505") || msg.contains("template_name")) {
                 return ResponseEntity.status(HttpStatus.CONFLICT)
                         .body(Map.of("message", DUPLICATE_TEMPLATE_MSG));

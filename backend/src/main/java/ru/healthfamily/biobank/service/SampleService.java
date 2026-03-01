@@ -38,6 +38,7 @@ public class SampleService {
     private final StorageContainerRepository containerRepository;
     private final VisitRepository visitRepository;
     private final EntityManager entityManager;
+    private final SampleTransactionService sampleTransactionService;
 
     @Transactional
     public List<SampleDTO> getSamples(
@@ -88,6 +89,11 @@ public class SampleService {
         applyRequest(sample, request);
         Sample saved = sampleRepository.save(sample);
         updateContainerCountsFromSpecimens(saved.getSpecimens());
+        try {
+            sampleTransactionService.recordSampleCreated(saved);
+        } catch (Exception e) {
+            // ignore - journal is optional
+        }
         return toDTO(saved);
     }
 
@@ -118,6 +124,11 @@ public class SampleService {
     public void deleteSample(Long sampleId) {
         Sample sample = sampleRepository.findById(sampleId)
                 .orElseThrow(() -> new RuntimeException("Образец не найден"));
+        try {
+            sampleTransactionService.recordSampleWithdrawn(sample);
+        } catch (Exception e) {
+            // ignore - journal is optional
+        }
         java.util.Set<Long> containerIds = sample.getSpecimens().stream()
                 .map(Specimen::getContainerId)
                 .filter(Objects::nonNull)
@@ -177,20 +188,20 @@ public class SampleService {
 
         sample.getSpecimens().clear();
         entityManager.flush();
+        Long inStorageId = getInStorageStatusId();
         if (request.getSpecimens() != null && !request.getSpecimens().isEmpty()) {
             for (CreateSampleRequest.SpecimenItem item : request.getSpecimens()) {
                 Specimen specimen = new Specimen();
                 specimen.setSample(sample);
                 specimen.setBarcode(item.getBarcode());
-                specimen.setSampleStatusId(item.getSampleStatusId());
+                specimen.setSampleStatusId(item.getSampleStatusId() != null ? item.getSampleStatusId() : inStorageId);
                 specimen.setContainerId(item.getContainerId() != null ? item.getContainerId() : request.getContainerId());
                 specimen.setPositionInContainer(item.getPositionInContainer());
                 sample.getSpecimens().add(specimen);
             }
         }
-        Long inStorageStatusId = getInStorageStatusId();
         int currentQty = (int) sample.getSpecimens().stream()
-                .filter(s -> inStorageStatusId != null && inStorageStatusId.equals(s.getSampleStatusId()))
+                .filter(s -> inStorageId != null && inStorageId.equals(s.getSampleStatusId()))
                 .count();
         sample.setCurrentQuantity(currentQty);
     }

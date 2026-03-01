@@ -34,5 +34,6 @@ public class StorageUnit {
     private Integer shelvesCount;
 
     @OneToMany(mappedBy = "unit", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("shelfNumber, shelfPosition, containerNumber")
     private List<StorageContainer> containers = new ArrayList<>();
 }

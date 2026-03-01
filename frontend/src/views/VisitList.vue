@@ -274,10 +274,9 @@
             <select
               id="modalPatient"
               v-model="modalVisit.patientId"
-              required
               class="form-control"
             >
-              <option value="">Не указано</option>
+              <option :value="null">Не указано</option>
               <option
                 v-for="patient in patients"
                 :key="patient.patientId"
@@ -292,10 +291,9 @@
             <select
               id="modalResearch"
               v-model="modalVisit.researchId"
-              required
               class="form-control"
             >
-              <option value="">Не указано</option>
+              <option :value="null">Не указано</option>
               <option
                 v-for="research in researches"
                 :key="research.researchId"
@@ -304,17 +302,6 @@
                 {{ research.researchNumber }} — {{ research.researchName }}
               </option>
             </select>
-          </div>
-          <div class="form-group">
-            <label for="modalVisitNumber">Номер визита *</label>
-            <input
-              id="modalVisitNumber"
-              v-model.number="modalVisit.visitNumber"
-              type="number"
-              min="1"
-              required
-              class="form-control"
-            />
           </div>
           <div class="form-group">
             <label for="modalCollection">Дата забора *</label>
@@ -327,6 +314,19 @@
             />
           </div>
           <div class="form-group">
+            <label for="modalVisitNumber">Номер визита *</label>
+            <input
+              id="modalVisitNumber"
+              v-model.number="modalVisit.visitNumber"
+              type="number"
+              min="1"
+              required
+              class="form-control"
+              placeholder="Выберите пациента"
+              readonly
+            />
+          </div>
+          <div class="form-group">
             <label for="modalAge">Возраст *</label>
             <input
               id="modalAge"
@@ -335,66 +335,14 @@
               min="0"
               required
               class="form-control"
+              placeholder="Выберите пациента"
               readonly
             />
           </div>
-          <div class="form-group with-action">
+          <div class="form-group">
             <label for="modalDiagnosis">Основной диагноз</label>
-            <div class="input-action">
-              <select
-                id="modalDiagnosis"
-                v-model="modalVisit.diagnosisId"
-                class="form-control"
-              >
-                <option value="">Не указано</option>
-                <option
-                  v-for="diagnosis in diagnoses"
-                  :key="diagnosis.diagnosisId"
-                  :value="diagnosis.diagnosisId"
-                >
-                  {{ diagnosis.diagnosisName }}
-                </option>
-              </select>
-              <div class="icon-actions">
-                <button
-                  type="button"
-                  class="icon-button"
-                  @click="openDiagnosisModal()"
-                  aria-label="Добавить"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M11 5h2v14h-2zM5 11h14v2H5z" fill="currentColor" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  class="icon-button"
-                  :disabled="!modalVisit.diagnosisId"
-                  @click="openDiagnosisModal(modalVisit.diagnosisId)"
-                  aria-label="Обновить"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path
-                      d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25z"
-                      fill="currentColor"
-                    />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  class="icon-button danger"
-                  :disabled="!modalVisit.diagnosisId"
-                  @click="deleteDiagnosisQuick(modalVisit.diagnosisId)"
-                  aria-label="Удалить"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path
-                      d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2H8l1-2z"
-                      fill="currentColor"
-                    />
-                  </svg>
-                </button>
-              </div>
+            <div id="modalDiagnosis" class="comorbid-display">
+              {{ getModalMainDiagnosisDisplay() }}
             </div>
           </div>
           <div class="form-group">
@@ -406,6 +354,14 @@
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">
               {{ modalMode === "edit" ? "Обновить" : "Добавить" }}
+            </button>
+            <button
+              v-if="modalMode === 'create'"
+              type="button"
+              class="btn btn-secondary"
+              @click="resetVisitForm"
+            >
+              Очистить
             </button>
           </div>
         </form>
@@ -446,6 +402,14 @@
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">
               {{ refModalMode === "edit" ? "Обновить" : "Добавить" }}
+            </button>
+            <button
+              v-if="refModalMode === 'create'"
+              type="button"
+              class="btn btn-secondary"
+              @click="resetDiagnosisModalForm"
+            >
+              Очистить
             </button>
           </div>
         </form>
@@ -511,6 +475,21 @@ export default defineComponent({
       canCreate: computed(() => store.getters.hasPermission("visit.create")),
       canUpdate: computed(() => store.getters.hasPermission("visit.update")),
       canDelete: computed(() => store.getters.hasPermission("visit.delete")),
+      canCreateRef: computed(
+        () =>
+          store.getters.hasPermission("reference.create") ||
+          store.getters.hasPermission("reference.manage")
+      ),
+      canUpdateRef: computed(
+        () =>
+          store.getters.hasPermission("reference.update") ||
+          store.getters.hasPermission("reference.manage")
+      ),
+      canDeleteRef: computed(
+        () =>
+          store.getters.hasPermission("reference.delete") ||
+          store.getters.hasPermission("reference.manage")
+      ),
     };
   },
   data() {
@@ -665,6 +644,12 @@ export default defineComponent({
         .filter((label) => label && label !== "—");
       return labels.length > 0 ? labels.join(";\n") : "—";
     },
+    getModalMainDiagnosisDisplay() {
+      if (!this.modalVisit.patientId) {
+        return "Выберите пациента";
+      }
+      return this.getDiagnosisDisplay(this.modalVisit.diagnosisId);
+    },
     getModalComorbidDisplay() {
       if (!this.modalVisit.patientId) {
         return "Выберите пациента";
@@ -738,6 +723,10 @@ export default defineComponent({
     },
     closeDiagnosisModal() {
       this.refModalOpen = false;
+    },
+    resetDiagnosisModalForm() {
+      this.refDiagnosisCode = "";
+      this.refDiagnosisName = "";
     },
     fillDiagnosisModal() {
       const diagnosis = this.diagnoses.find(
@@ -830,6 +819,7 @@ export default defineComponent({
       } else {
         this.modalVisit.diagnosisId = null;
         this.modalVisit.visitNumber = null;
+        this.modalVisit.ageAtCollection = null;
       }
     },
     getNextVisitNumber(patientId: number) {
@@ -863,7 +853,26 @@ export default defineComponent({
     closeModal() {
       this.modalOpen = false;
     },
+    resetVisitForm() {
+      this.modalVisit = {
+        patientId: null,
+        researchId: null,
+        visitNumber: null,
+        collectionDate: this.getNowLocalDatetime(),
+        ageAtCollection: null,
+        diagnosisId: null,
+      };
+      this.errorMessage = "";
+    },
     async submitModal() {
+      if (
+        this.modalMode === "create" &&
+        (this.modalVisit.patientId == null ||
+          this.modalVisit.researchId == null)
+      ) {
+        this.errorMessage = "Выберите пациента и исследование";
+        return;
+      }
       if (this.modalMode === "create") {
         await this.createVisit();
       } else {
@@ -1019,6 +1028,12 @@ h2 {
   display: flex;
   align-items: flex-end;
   gap: 8px;
+}
+
+#modalVisitNumber::placeholder,
+#modalAge::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.7;
 }
 
 .table-wrapper {
@@ -1310,8 +1325,8 @@ h2 {
 }
 
 .form-modal {
-  min-height: 600px;
-  max-height: calc(100vh - 120px);
+  min-height: 50vh;
+  max-height: 85vh;
   overflow: auto;
 }
 

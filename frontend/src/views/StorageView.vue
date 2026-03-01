@@ -1,6 +1,8 @@
 <template>
   <div class="storage-page">
-    <h2>Хранилища</h2>
+    <div class="page-header">
+      <h2>Хранилища</h2>
+    </div>
 
     <div v-if="successMessage" class="alert alert-success">
       {{ successMessage }}
@@ -172,25 +174,31 @@
                 >
                   <button
                     class="tree-button"
-                    :class="{ active: selectedUnitId === unit.unitId }"
+                    :class="{ active: expandedUnitIds.has(unit.unitId) }"
                     @click="selectUnit(unit.unitId)"
                   >
                     {{ unit.unitName }} ({{ unit.unitTypeName }})
                   </button>
 
                   <div
-                    v-if="selectedUnitId === unit.unitId"
+                    v-if="expandedUnitIds.has(unit.unitId)"
                     class="tree-children"
                   >
                     <div class="section-header">
-                      <h5>Полки</h5>
+                      <h5>
+                        {{
+                          getUnitShelves(unit).length > 0
+                            ? "Полки"
+                            : "Контейнеры"
+                        }}
+                      </h5>
                       <div class="action-buttons">
                         <button
                           v-if="canCreate"
                           class="icon-button"
                           title="Добавить"
                           aria-label="Добавить"
-                          @click="openContainerModal"
+                          @click="openContainerModalForUnit(unit)"
                         >
                           <svg viewBox="0 0 24 24" aria-hidden="true">
                             <path
@@ -232,20 +240,51 @@
                       </div>
                     </div>
 
-                    <div v-if="unitShelves.length === 0" class="empty-state">
-                      Полки не указаны
-                    </div>
+                    <template v-if="getUnitShelves(unit).length === 0">
+                      <div
+                        v-if="getContainersWithoutShelf(unit).length === 0"
+                        class="empty-state"
+                      >
+                        Контейнеры отсутствуют
+                      </div>
+                      <div v-else class="tree">
+                        <template
+                          v-for="container in getContainersWithoutShelf(unit)"
+                          :key="container.containerId"
+                        >
+                          <button
+                            class="tree-button"
+                            :class="{
+                              active:
+                                selectedContainerId === container.containerId,
+                            }"
+                            @click="selectContainer(container.containerId)"
+                          >
+                            {{
+                              container.templateName ||
+                              container.containerNumber ||
+                              "Контейнер"
+                            }}
+                            {{
+                              container.containerNumber
+                                ? container.containerNumber
+                                : ""
+                            }}
+                          </button>
+                        </template>
+                      </div>
+                    </template>
 
                     <div v-else class="tree">
                       <div
-                        v-for="shelf in unitShelves"
+                        v-for="shelf in getUnitShelves(unit)"
                         :key="shelf.index"
                         class="tree-item"
                       >
                         <button
                           class="tree-button"
                           :class="{
-                            active: selectedShelfIndex === shelf.index,
+                            active: expandedShelfIndices.has(shelf.index),
                           }"
                           @click="selectShelf(shelf.index)"
                         >
@@ -253,51 +292,47 @@
                         </button>
 
                         <div
-                          v-if="selectedShelfIndex === shelf.index"
+                          v-if="expandedShelfIndices.has(shelf.index)"
                           class="tree-children"
                         >
                           <div
-                            v-if="filteredContainers.length === 0"
+                            v-if="
+                              getContainersForShelfInUnit(unit, shelf.index)
+                                .length === 0
+                            "
                             class="empty-state"
                           >
                             Контейнеры отсутствуют
                           </div>
                           <div v-else class="tree">
-                            <button
-                              v-for="container in filteredContainers"
+                            <template
+                              v-for="container in getContainersForShelfInUnit(
+                                unit,
+                                shelf.index
+                              )"
                               :key="container.containerId"
-                              class="tree-button"
-                              :class="{
-                                active:
-                                  selectedContainerId === container.containerId,
-                              }"
-                              draggable="true"
-                              @dragstart="
-                                onDragStart(
-                                  container.containerId,
-                                  selectedShelfIndex
-                                )
-                              "
-                              @dragover="onDragOver"
-                              @drop="
-                                onDropOnContainer(
-                                  selectedShelfIndex,
-                                  container.containerId
-                                )
-                              "
-                              @click="selectContainer(container.containerId)"
                             >
-                              {{
-                                container.templateName ||
-                                container.containerNumber ||
-                                "Контейнер"
-                              }}
-                              {{
-                                container.containerNumber
-                                  ? `№${container.containerNumber}`
-                                  : ""
-                              }}
-                            </button>
+                              <button
+                                class="tree-button"
+                                :class="{
+                                  active:
+                                    selectedContainerId ===
+                                    container.containerId,
+                                }"
+                                @click="selectContainer(container.containerId)"
+                              >
+                                {{
+                                  container.templateName ||
+                                  container.containerNumber ||
+                                  "Контейнер"
+                                }}
+                                {{
+                                  container.containerNumber
+                                    ? container.containerNumber
+                                    : ""
+                                }}
+                              </button>
+                            </template>
                           </div>
                         </div>
                       </div>
@@ -315,155 +350,253 @@
           <h3>Схема хранилища</h3>
         </div>
 
-        <div v-if="!selectedUnit" class="empty-state">
+        <div v-if="expandedUnits.length === 0" class="empty-state">
           Выберите хранилище слева, чтобы увидеть схему.
         </div>
 
-        <div v-else class="scheme">
-          <div
-            v-for="shelf in schemeShelves"
-            :key="shelf.key"
-            class="shelf-block"
-            @dragover="onDragOver"
-            @drop="shelf.index ? onDropOnShelf(shelf.index) : undefined"
-          >
-            <div class="shelf-title">{{ shelf.label }}</div>
-            <div v-if="shelf.containers.length === 0" class="empty-state">
-              Контейнеры отсутствуют
-            </div>
-            <div v-else class="shelf-containers">
+        <div v-else class="scheme scheme-multi-units">
+          <template v-for="unit in expandedUnits" :key="unit.unitId">
+            <div class="scheme-unit-block">
+              <h4 class="scheme-unit-title">
+                {{ unit.unitName }} ({{ unit.unitTypeName }})
+              </h4>
               <div
-                v-for="container in shelf.containers"
-                :key="container.containerId"
-                class="container-scheme"
-                :class="{
-                  selected: selectedContainerId === container.containerId,
-                }"
-                :style="{ '--grid-width': containerGridWidth(container) }"
-                draggable="true"
-                @dragstart="onDragStart(container.containerId, shelf.index)"
-                @dragover="onDragOver"
-                @drop="onDropOnContainer(shelf.index, container.containerId)"
-                @click="selectContainer(container.containerId)"
+                v-for="shelf in getSchemeShelvesForUnit(unit)"
+                :key="`${unit.unitId}-${shelf.key}`"
+                class="shelf-block"
+                @dragenter.prevent="onDragOver"
+                @dragover.prevent="onDragOver"
+                @drop.prevent="onDropBetween(unit.unitId, shelf.index, null)"
               >
-                <div class="container-path">
-                  {{ containerPath(container, shelf.label) }}
+                <div class="shelf-title">{{ shelf.label }}</div>
+                <div v-if="shelf.containers.length === 0" class="empty-state">
+                  Контейнеры отсутствуют
                 </div>
-                <div
-                  v-if="container.numberingType === 'SEQUENTIAL'"
-                  class="scheme-grid scheme-grid-sequential"
-                  :style="{
-                    gridTemplateColumns: `repeat(${containerGridColumns(
-                      container
-                    )}, var(--cell-size))`,
-                    gridTemplateRows: `repeat(${containerGridRows(
-                      container
-                    )}, calc(var(--cell-label-height) + var(--cell-size))`,
-                  }"
-                >
+                <div v-else class="shelf-containers shelf-containers-with-drop">
                   <template
-                    v-for="row in containerGridRows(container)"
-                    :key="`row-${row}`"
+                    v-for="container in shelf.containers"
+                    :key="container.containerId"
                   >
                     <div
-                      v-for="cell in containerRowCells(container, row)"
-                      :key="cell.label"
-                      class="scheme-cell-sequential-wrapper"
-                    >
-                      <div class="scheme-cell-label-above">
-                        {{ cell.label }}
-                      </div>
-                      <div
-                        class="scheme-cell"
-                        :class="{
-                          filled: cell.filled,
-                          'filled-with-icon':
-                            cell.filled && !!cell.sampleTypeIconUrl,
-                          'expiry-green': cell.expiryStatus === 'GREEN',
-                          'expiry-yellow': cell.expiryStatus === 'YELLOW',
-                          'expiry-red': cell.expiryStatus === 'RED',
-                        }"
-                        :title="cell.sampleBarcode || ''"
-                        @click="onCellClick(container, cell)"
-                      >
-                        <div
-                          v-if="cell.filled && cell.sampleTypeIconUrl"
-                          class="scheme-cell-icon-wrap"
-                        >
-                          <img
-                            :src="cell.sampleTypeIconUrl"
-                            class="scheme-cell-icon"
-                            :alt="''"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </template>
-                </div>
-                <div
-                  v-else
-                  class="scheme-grid"
-                  :style="{
-                    gridTemplateColumns: `auto repeat(${containerGridColumns(
-                      container
-                    )}, var(--cell-size))`,
-                    gridTemplateRows: `auto repeat(${containerGridRows(
-                      container
-                    )}, var(--cell-size))`,
-                  }"
-                >
-                  <div class="scheme-grid-corner"></div>
-                  <div
-                    v-for="col in containerGridColumns(container)"
-                    :key="`col-${col}`"
-                    class="scheme-grid-header"
-                  >
-                    {{ getColumnHeaderLabel(container, col) }}
-                  </div>
-                  <template
-                    v-for="row in containerGridRows(container)"
-                    :key="`row-${row}`"
-                  >
-                    <div class="scheme-grid-header row-header">
-                      {{ getRowHeaderLabel(container, row) }}
-                    </div>
-                    <div
-                      v-for="cell in containerRowCells(container, row)"
-                      :key="cell.label"
-                      class="scheme-cell"
+                      class="drop-zone-scheme"
                       :class="{
-                        filled: cell.filled,
-                        'filled-with-icon':
-                          cell.filled && !!cell.sampleTypeIconUrl,
-                        'expiry-green': cell.expiryStatus === 'GREEN',
-                        'expiry-yellow': cell.expiryStatus === 'YELLOW',
-                        'expiry-red': cell.expiryStatus === 'RED',
+                        'drop-zone-active':
+                          dragDropTarget?.unitId === unit.unitId &&
+                          dragDropTarget?.shelfIndex === shelf.index &&
+                          dragDropTarget?.beforeContainerId ===
+                            container.containerId,
                       }"
-                      :title="cell.sampleBarcode || ''"
-                      @click="onCellClick(container, cell)"
+                      @dragenter.prevent="
+                        setDragDropTarget(
+                          unit.unitId,
+                          shelf.index,
+                          container.containerId
+                        )
+                      "
+                      @dragover.prevent="
+                        setDragDropTarget(
+                          unit.unitId,
+                          shelf.index,
+                          container.containerId
+                        )
+                      "
+                      @dragleave="onDragLeaveDropZone"
+                      @drop.prevent.stop="
+                        onDropBetween(
+                          unit.unitId,
+                          shelf.index,
+                          container.containerId
+                        )
+                      "
                     >
                       <div
-                        v-if="cell.filled && cell.sampleTypeIconUrl"
-                        class="scheme-cell-icon-wrap"
+                        v-if="
+                          dragDropTarget?.unitId === unit.unitId &&
+                          dragDropTarget?.shelfIndex === shelf.index &&
+                          dragDropTarget?.beforeContainerId ===
+                            container.containerId
+                        "
+                        class="drop-indicator-scheme"
+                      />
+                    </div>
+                    <div
+                      class="container-scheme"
+                      :class="{
+                        selected: selectedContainerId === container.containerId,
+                      }"
+                      :style="{ '--grid-width': containerGridWidth(container) }"
+                      draggable="true"
+                      @dragstart="
+                        onDragStart(
+                          $event,
+                          container.containerId,
+                          shelf.index,
+                          unit.unitId
+                        )
+                      "
+                      @dragenter.prevent="onDragOver"
+                      @dragover.prevent="onDragOver"
+                      @drop.prevent.stop="
+                        onDropOnContainer(
+                          unit.unitId,
+                          shelf.index,
+                          container.containerId
+                        )
+                      "
+                      @click="selectContainer(container.containerId)"
+                    >
+                      <div class="container-path">
+                        {{ containerPath(container, shelf.label, unit) }}
+                      </div>
+                      <div
+                        v-if="container.numberingType === 'SEQUENTIAL'"
+                        class="scheme-grid scheme-grid-sequential"
+                        :style="{
+                          gridTemplateColumns: `repeat(${containerGridColumns(
+                            container
+                          )}, var(--cell-size))`,
+                          gridTemplateRows: `repeat(${containerGridRows(
+                            container
+                          )}, calc(var(--cell-label-height) + var(--cell-size))`,
+                        }"
                       >
-                        <img
-                          :src="cell.sampleTypeIconUrl"
-                          class="scheme-cell-icon"
-                          :alt="''"
-                        />
+                        <template
+                          v-for="row in containerGridRows(container)"
+                          :key="`row-${row}`"
+                        >
+                          <div
+                            v-for="cell in containerRowCells(container, row)"
+                            :key="cell.label"
+                            class="scheme-cell-sequential-wrapper"
+                          >
+                            <div class="scheme-cell-label-above">
+                              {{ cell.label }}
+                            </div>
+                            <div
+                              class="scheme-cell"
+                              :class="{
+                                filled: cell.filled,
+                                'filled-with-icon':
+                                  cell.filled && !!cell.sampleTypeIconUrl,
+                                'cell-withdrawn': cell.withdrawn,
+                                'expiry-green': cell.expiryStatus === 'GREEN',
+                                'expiry-yellow': cell.expiryStatus === 'YELLOW',
+                                'expiry-red': cell.expiryStatus === 'RED',
+                              }"
+                              :title="cell.sampleBarcode || ''"
+                              @click="onCellClick(container, cell, unit)"
+                            >
+                              <div
+                                v-if="cell.filled && cell.sampleTypeIconUrl"
+                                class="scheme-cell-icon-wrap"
+                              >
+                                <img
+                                  :src="cell.sampleTypeIconUrl"
+                                  class="scheme-cell-icon"
+                                  :alt="''"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                      <div
+                        v-else
+                        class="scheme-grid"
+                        :style="{
+                          gridTemplateColumns: `auto repeat(${containerGridColumns(
+                            container
+                          )}, var(--cell-size))`,
+                          gridTemplateRows: `auto repeat(${containerGridRows(
+                            container
+                          )}, var(--cell-size))`,
+                        }"
+                      >
+                        <div class="scheme-grid-corner"></div>
+                        <div
+                          v-for="col in containerGridColumns(container)"
+                          :key="`col-${col}`"
+                          class="scheme-grid-header"
+                        >
+                          {{ getColumnHeaderLabel(container, col) }}
+                        </div>
+                        <template
+                          v-for="row in containerGridRows(container)"
+                          :key="`row-${row}`"
+                        >
+                          <div class="scheme-grid-header row-header">
+                            {{ getRowHeaderLabel(container, row) }}
+                          </div>
+                          <div
+                            v-for="cell in containerRowCells(container, row)"
+                            :key="cell.label"
+                            class="scheme-cell"
+                            :class="{
+                              filled: cell.filled,
+                              'filled-with-icon':
+                                cell.filled && !!cell.sampleTypeIconUrl,
+                              'cell-withdrawn': cell.withdrawn,
+                              'expiry-green': cell.expiryStatus === 'GREEN',
+                              'expiry-yellow': cell.expiryStatus === 'YELLOW',
+                              'expiry-red': cell.expiryStatus === 'RED',
+                            }"
+                            :title="cell.sampleBarcode || ''"
+                            @click="onCellClick(container, cell, unit)"
+                          >
+                            <div
+                              v-if="cell.filled && cell.sampleTypeIconUrl"
+                              class="scheme-cell-icon-wrap"
+                            >
+                              <img
+                                :src="cell.sampleTypeIconUrl"
+                                class="scheme-cell-icon"
+                                :alt="''"
+                              />
+                            </div>
+                          </div>
+                        </template>
                       </div>
                     </div>
                   </template>
+                  <div
+                    v-if="shelf.containers.length > 0"
+                    class="drop-zone-scheme drop-zone-scheme-end"
+                    :class="{
+                      'drop-zone-active':
+                        dragDropTarget?.unitId === unit.unitId &&
+                        dragDropTarget?.shelfIndex === shelf.index &&
+                        dragDropTarget?.beforeContainerId === null,
+                    }"
+                    @dragenter.prevent="
+                      setDragDropTarget(unit.unitId, shelf.index, null)
+                    "
+                    @dragover.prevent="
+                      setDragDropTarget(unit.unitId, shelf.index, null)
+                    "
+                    @dragleave="onDragLeaveDropZone"
+                    @drop.prevent.stop="
+                      onDropBetween(unit.unitId, shelf.index, null)
+                    "
+                  >
+                    <div
+                      v-if="
+                        dragDropTarget?.unitId === unit.unitId &&
+                        dragDropTarget?.shelfIndex === shelf.index &&
+                        dragDropTarget?.beforeContainerId === null
+                      "
+                      class="drop-indicator-scheme"
+                    />
+                  </div>
                 </div>
+                <div class="shelf-divider"></div>
               </div>
             </div>
-            <div class="shelf-divider"></div>
-          </div>
+          </template>
         </div>
 
         <aside class="sample-drawer" :class="{ open: sampleDrawerOpen }">
           <div class="drawer-header">
-            <div>
+            <div class="drawer-header-top">
               <h3 class="drawer-title">
                 {{
                   sampleDrawerMode === "details"
@@ -473,47 +606,139 @@
                     : "Добавить образец"
                 }}
               </h3>
+              <div class="drawer-actions">
+                <template
+                  v-if="
+                    sampleDrawerMode === 'details' &&
+                    selectedSample &&
+                    selectedSpecimen &&
+                    !isSpecimenExhausted(selectedSpecimen.sampleStatusId)
+                  "
+                >
+                  <button
+                    v-if="canUpdateSample"
+                    class="icon-button"
+                    type="button"
+                    :title="
+                      isSpecimenWithdrawn(selectedSpecimen.sampleStatusId)
+                        ? 'Вернуть в хранилище'
+                        : 'Изъять из хранилища'
+                    "
+                    :aria-label="
+                      isSpecimenWithdrawn(selectedSpecimen.sampleStatusId)
+                        ? 'Вернуть'
+                        : 'Изъять'
+                    "
+                    @click="
+                      openSpecimenActionDrawer(
+                        selectedSpecimen,
+                        isSpecimenWithdrawn(selectedSpecimen.sampleStatusId)
+                          ? 'return'
+                          : 'withdraw'
+                      )
+                    "
+                  >
+                    <svg
+                      v-if="
+                        isSpecimenWithdrawn(selectedSpecimen.sampleStatusId)
+                      "
+                      viewBox="0 0 24 24"
+                      class="drawer-action-icon"
+                    >
+                      <path
+                        d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                    <svg v-else viewBox="0 0 24 24" class="drawer-action-icon">
+                      <path
+                        d="M12 19V5l7 7-7 7zM5 19V5l7 7-7 7z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    v-if="canUpdateSample"
+                    class="icon-button"
+                    type="button"
+                    title="Исчерпан"
+                    aria-label="Исчерпан"
+                    @click="
+                      openSpecimenActionDrawer(selectedSpecimen, 'exhaust')
+                    "
+                  >
+                    <svg viewBox="0 0 24 24" class="drawer-action-icon">
+                      <path
+                        d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </button>
+                </template>
+                <button
+                  v-if="
+                    sampleDrawerMode === 'details' &&
+                    selectedSample &&
+                    selectedSpecimen
+                  "
+                  class="icon-button"
+                  type="button"
+                  title="Журнал операций"
+                  aria-label="Журнал"
+                  @click="openSpecimenJournalDrawer(selectedSpecimen)"
+                >
+                  <svg viewBox="0 0 24 24" class="drawer-action-icon">
+                    <path
+                      d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                </button>
+                <button
+                  v-if="sampleDrawerMode === 'details' && selectedSample"
+                  class="icon-button"
+                  type="button"
+                  aria-label="Обновить"
+                  title="Обновить"
+                  @click="openSampleEdit"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                </button>
+                <button
+                  v-if="sampleDrawerMode === 'details' && selectedSample"
+                  class="icon-button danger"
+                  type="button"
+                  aria-label="Удалить"
+                  title="Удалить"
+                  @click="deleteSampleInDrawer"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2H8l1-2z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                </button>
+                <button class="btn btn-secondary" @click="closeSampleDrawer">
+                  Закрыть
+                </button>
+              </div>
+            </div>
+            <div
+              v-if="drawerContainer || selectedCell"
+              class="drawer-path-block"
+            >
               <p v-if="drawerContainer" class="drawer-subtitle">
                 {{ containerPath(drawerContainer, drawerShelfLabel) }}
               </p>
               <p v-if="selectedCell" class="drawer-meta">
                 Позиция: {{ selectedCell.label }}
               </p>
-            </div>
-            <div class="drawer-actions">
-              <button
-                v-if="sampleDrawerMode === 'details' && selectedSample"
-                class="icon-button"
-                type="button"
-                aria-label="Обновить"
-                title="Обновить"
-                @click="openSampleEdit"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path
-                    d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25z"
-                    fill="currentColor"
-                  />
-                </svg>
-              </button>
-              <button
-                v-if="sampleDrawerMode === 'details' && selectedSample"
-                class="icon-button danger"
-                type="button"
-                aria-label="Удалить"
-                title="Удалить"
-                @click="deleteSampleInDrawer"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path
-                    d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2H8l1-2z"
-                    fill="currentColor"
-                  />
-                </svg>
-              </button>
-              <button class="btn btn-secondary" @click="closeSampleDrawer">
-                Закрыть
-              </button>
             </div>
           </div>
 
@@ -669,19 +894,6 @@
                     placeholder="Штрихкод"
                   />
                   <select
-                    v-model.number="specimen.sampleStatusId"
-                    class="form-control"
-                  >
-                    <option :value="null">Не указано</option>
-                    <option
-                      v-for="status in sampleStatuses"
-                      :key="status.sampleStatusId"
-                      :value="status.sampleStatusId"
-                    >
-                      {{ status.sampleStatusName }}
-                    </option>
-                  </select>
-                  <select
                     v-model="specimen.positionInContainer"
                     class="form-control"
                     :disabled="!drawerSampleForm.containerId"
@@ -707,6 +919,14 @@
               <button type="submit" class="btn btn-primary">
                 {{ sampleDrawerMode === "edit" ? "Обновить" : "Добавить" }}
               </button>
+              <button
+                v-if="sampleDrawerMode === 'create'"
+                type="button"
+                class="btn btn-secondary"
+                @click="resetDrawerSampleForm"
+              >
+                Очистить
+              </button>
             </div>
           </form>
         </aside>
@@ -730,7 +950,7 @@
                 required
                 type="text"
                 class="form-control"
-                placeholder="Основной склад"
+                placeholder="Введите название локации"
               />
             </div>
             <div class="form-group">
@@ -762,7 +982,7 @@
                 v-model="modalLocation.description"
                 type="text"
                 class="form-control"
-                placeholder="Доп. информация"
+                placeholder="Дополнительная информация"
               />
             </div>
           </template>
@@ -777,7 +997,7 @@
                   class="form-control"
                   required
                 >
-                  <option :value="null">— Выберите тип —</option>
+                  <option :value="null">Выберите тип</option>
                   <option
                     v-for="ut in unitTypes"
                     :key="ut.unitTypeId"
@@ -786,8 +1006,12 @@
                     {{ ut.unitTypeName }}
                   </option>
                 </select>
-                <div class="icon-actions">
+                <div
+                  v-if="canCreateRef || canUpdateRef || canDeleteRef"
+                  class="icon-actions"
+                >
                   <button
+                    v-if="canCreateRef"
                     type="button"
                     class="icon-button"
                     @click="openUnitTypeRefModal()"
@@ -801,6 +1025,7 @@
                     </svg>
                   </button>
                   <button
+                    v-if="canUpdateRef"
                     type="button"
                     class="icon-button"
                     :disabled="!modalUnit.unitTypeId"
@@ -815,6 +1040,7 @@
                     </svg>
                   </button>
                   <button
+                    v-if="canDeleteRef"
                     type="button"
                     class="icon-button danger"
                     :disabled="!modalUnit.unitTypeId"
@@ -839,7 +1065,7 @@
                 required
                 type="text"
                 class="form-control"
-                placeholder="Хранилище №1"
+                placeholder="Введите название хранилища"
               />
             </div>
             <div class="form-group">
@@ -866,7 +1092,7 @@
                   @change="onContainerTemplateChange"
                 >
                   <option :value="null">
-                    — Выберите шаблон или введите свои данные —
+                    Выберите шаблон или введите свои данные
                   </option>
                   <option
                     v-for="t in containerTemplates"
@@ -878,8 +1104,12 @@
                     }}, {{ numberingTypeLabel(t.numberingType) }})
                   </option>
                 </select>
-                <div class="icon-actions">
+                <div
+                  v-if="canCreateRef || canUpdateRef || canDeleteRef"
+                  class="icon-actions"
+                >
                   <button
+                    v-if="canCreateRef"
                     type="button"
                     class="icon-button"
                     @click="openTemplateRefModal()"
@@ -893,6 +1123,7 @@
                     </svg>
                   </button>
                   <button
+                    v-if="canUpdateRef"
                     type="button"
                     class="icon-button"
                     :disabled="!modalContainer.templateId"
@@ -907,6 +1138,7 @@
                     </svg>
                   </button>
                   <button
+                    v-if="canDeleteRef"
                     type="button"
                     class="icon-button danger"
                     :disabled="!modalContainer.templateId"
@@ -999,15 +1231,17 @@
                 />
               </div>
               <div class="form-group">
-                <label for="modalShelf">Номер полки *</label>
+                <label for="modalShelf">
+                  Номер полки {{ selectedUnit?.shelvesCount ? "*" : "" }}
+                </label>
                 <input
                   id="modalShelf"
                   v-model.number="modalContainer.shelfNumber"
                   type="number"
                   min="1"
-                  required
+                  :required="!!selectedUnit?.shelvesCount"
                   class="form-control"
-                  placeholder="1"
+                  :placeholder="selectedUnit?.shelvesCount ? '1' : 'Не указано'"
                 />
               </div>
             </div>
@@ -1025,6 +1259,14 @@
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">
               {{ modalMode === "edit" ? "Обновить" : "Добавить" }}
+            </button>
+            <button
+              v-if="modalMode === 'create'"
+              type="button"
+              class="btn btn-secondary"
+              @click="resetStorageModalForm"
+            >
+              Очистить
             </button>
           </div>
         </form>
@@ -1056,6 +1298,14 @@
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">
               {{ unitTypeRefModalMode === "edit" ? "Обновить" : "Добавить" }}
+            </button>
+            <button
+              v-if="unitTypeRefModalMode === 'create'"
+              type="button"
+              class="btn btn-secondary"
+              @click="unitTypeRefModalName = ''"
+            >
+              Очистить
             </button>
           </div>
         </form>
@@ -1122,8 +1372,128 @@
             <button type="submit" class="btn btn-primary">
               {{ templateRefModalMode === "edit" ? "Обновить" : "Добавить" }}
             </button>
+            <button
+              v-if="templateRefModalMode === 'create'"
+              type="button"
+              class="btn btn-secondary"
+              @click="resetTemplateRefForm"
+            >
+              Очистить
+            </button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <div
+      v-if="specimenActionModalOpen"
+      class="modal-overlay"
+      @click.self="closeSpecimenActionModal"
+    >
+      <div class="modal form-modal">
+        <div class="modal-header">
+          <h3>{{ specimenActionModalTitle }}</h3>
+          <button class="btn btn-secondary" @click="closeSpecimenActionModal">
+            Закрыть
+          </button>
+        </div>
+        <form @submit.prevent="submitSpecimenAction">
+          <div class="form-group">
+            <label>Дата и время операции *</label>
+            <input
+              v-model="specimenActionForm.transactionDate"
+              type="datetime-local"
+              required
+              class="form-control"
+            />
+          </div>
+          <div class="form-group">
+            <label>Ответственное подразделение</label>
+            <select
+              v-model.number="specimenActionForm.departmentId"
+              class="form-control"
+            >
+              <option :value="null">Не указано</option>
+              <option
+                v-for="d in departments"
+                :key="d.departmentId"
+                :value="d.departmentId"
+              >
+                {{ d.departmentName }}
+              </option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Цель операции</label>
+            <input
+              v-model="specimenActionForm.purpose"
+              type="text"
+              class="form-control"
+              placeholder="Цель"
+            />
+          </div>
+          <div class="form-group">
+            <label>Дополнительные примечания</label>
+            <textarea
+              v-model="specimenActionForm.notes"
+              class="form-control"
+              rows="3"
+              placeholder="Примечания"
+            />
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Подтвердить</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div
+      v-if="specimenJournalModalOpen"
+      class="modal-overlay"
+      @click.self="closeSpecimenJournalModal"
+    >
+      <div class="modal form-modal">
+        <div class="modal-header">
+          <h3>Журнал операций: {{ specimenJournalSpecimen?.barcode }}</h3>
+          <button class="btn btn-secondary" @click="closeSpecimenJournalModal">
+            Закрыть
+          </button>
+        </div>
+        <div v-if="specimenJournalLoading" class="subtle">Загрузка...</div>
+        <table v-else class="journal-table">
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>Операция</th>
+              <th>Пользователь</th>
+              <th>Подразделение</th>
+              <th>Цель</th>
+              <th>Примечания</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="tx in specimenJournalTransactions"
+              :key="tx.transactionId"
+            >
+              <td>{{ formatSpecimenTxDate(tx.transactionDate) }}</td>
+              <td>{{ tx.transactionTypeName }}</td>
+              <td>{{ tx.userFullName }}</td>
+              <td>{{ tx.departmentName || "—" }}</td>
+              <td>{{ tx.purpose || "—" }}</td>
+              <td>{{ tx.notes || "—" }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p
+          v-if="
+            !specimenJournalLoading && specimenJournalTransactions.length === 0
+          "
+          class="subtle"
+        >
+          Нет записей
+        </p>
       </div>
     </div>
   </div>
@@ -1142,6 +1512,7 @@ interface StorageContainer {
   currentSamplesCount: number;
   unitId: number;
   shelfNumber: number | null;
+  shelfPosition: number | null;
   templateId: number;
   templateName: string;
   rowsCount: number;
@@ -1278,7 +1649,27 @@ export default defineComponent({
     return {
       canCreate: computed(() => store.getters.hasPermission("storage.create")),
       canUpdate: computed(() => store.getters.hasPermission("storage.update")),
+      canUpdateSample: computed(
+        () =>
+          store.getters.hasPermission("sample.update") ||
+          store.getters.hasPermission("sample.manage")
+      ),
       canDelete: computed(() => store.getters.hasPermission("storage.delete")),
+      canCreateRef: computed(
+        () =>
+          store.getters.hasPermission("reference.create") ||
+          store.getters.hasPermission("reference.manage")
+      ),
+      canUpdateRef: computed(
+        () =>
+          store.getters.hasPermission("reference.update") ||
+          store.getters.hasPermission("reference.manage")
+      ),
+      canDeleteRef: computed(
+        () =>
+          store.getters.hasPermission("reference.delete") ||
+          store.getters.hasPermission("reference.manage")
+      ),
     };
   },
   data() {
@@ -1290,8 +1681,10 @@ export default defineComponent({
       errorMessage: "",
       selectedLocationId: null as number | null,
       showLocationDetailsId: null as number | null,
+      isRestoringStorageState: false,
       selectedUnitId: null as number | null,
-      selectedShelfIndex: null as number | null,
+      expandedUnitIds: new Set<number>(),
+      expandedShelfIndices: new Set<number>(),
       selectedContainerId: null as number | null,
       modalOpen: false,
       modalType: null as "location" | "unit" | "container" | null,
@@ -1319,6 +1712,13 @@ export default defineComponent({
       } as NewContainerForm,
       dragContainerId: null as number | null,
       dragSourceShelfIndex: null as number | null,
+      dragSourceUnitId: null as number | null,
+      dragDropTarget: null as {
+        unitId: number;
+        shelfIndex: number | null;
+        beforeContainerId: number | null;
+      } | null,
+      dragLeaveClearTimer: null as ReturnType<typeof setTimeout> | null,
       containerRefs: [] as StorageContainer[],
       visits: [] as VisitRef[],
       patients: [] as PatientRef[],
@@ -1326,6 +1726,28 @@ export default defineComponent({
       diagnoses: [] as DiagnosisRef[],
       sampleTypes: [] as SampleTypeRef[],
       sampleStatuses: [] as SampleStatusRef[],
+      departments: [] as { departmentId: number; departmentName: string }[],
+      specimenActionModalOpen: false,
+      specimenActionModalType: null as "withdraw" | "return" | "exhaust" | null,
+      specimenActionSpecimen: null as Specimen | null,
+      specimenActionForm: {
+        transactionDate: "",
+        departmentId: null as number | null,
+        purpose: "",
+        notes: "",
+      },
+      specimenJournalModalOpen: false,
+      specimenJournalSpecimen: null as Specimen | null,
+      specimenJournalTransactions: [] as Array<{
+        transactionId: number;
+        transactionDate: string;
+        transactionTypeName: string;
+        userFullName: string;
+        departmentName: string | null;
+        purpose: string | null;
+        notes: string | null;
+      }>,
+      specimenJournalLoading: false,
       containerTemplates: [] as ContainerTypeTemplate[],
       unitTypes: [] as Array<{ unitTypeId: number; unitTypeName: string }>,
       unitTypeRefModalOpen: false,
@@ -1368,24 +1790,41 @@ export default defineComponent({
     };
   },
   created() {
-    this.fetchLocations();
+    this.fetchLocations(true);
     this.fetchReferenceData();
+  },
+  beforeUnmount() {
+    this.saveStorageViewState();
   },
   watch: {
     selectedLocationId() {
+      if (this.isRestoringStorageState) return;
       this.selectedUnitId = null;
-      this.selectedShelfIndex = null;
+      this.expandedUnitIds = new Set();
+      this.expandedShelfIndices = new Set();
       this.selectedContainerId = null;
       this.closeSampleDrawer();
+      this.saveStorageViewState();
     },
-    selectedUnitId() {
-      this.selectedShelfIndex = null;
-      this.selectedContainerId = null;
-      this.closeSampleDrawer();
+    expandedUnitIds() {
+      if (this.isRestoringStorageState) return;
+      this.saveStorageViewState();
     },
-    selectedShelfIndex() {
-      this.selectedContainerId = null;
-      this.closeSampleDrawer();
+    expandedShelfIndices() {
+      if (this.isRestoringStorageState) return;
+      this.saveStorageViewState();
+    },
+    selectedContainerId() {
+      if (this.isRestoringStorageState) return;
+      this.saveStorageViewState();
+    },
+    showLocationDetailsId() {
+      if (this.isRestoringStorageState) return;
+      this.saveStorageViewState();
+    },
+    sampleDrawerOpen() {
+      if (this.isRestoringStorageState) return;
+      this.saveStorageViewState();
     },
     "drawerSampleForm.visitId": "syncDrawerCollectionFromVisit",
     "drawerSampleForm.containerId"(next: number | null, prev: number | null) {
@@ -1428,6 +1867,25 @@ export default defineComponent({
     },
   },
   computed: {
+    specimenActionModalTitle(): string {
+      if (this.specimenActionModalType === "withdraw")
+        return "Изъятие из хранилища";
+      if (this.specimenActionModalType === "return")
+        return "Возврат в хранилище";
+      if (this.specimenActionModalType === "exhaust") return "Проба исчерпана";
+      return "";
+    },
+    expandedUnits(): StorageUnit[] {
+      const result: StorageUnit[] = [];
+      for (const loc of this.locations) {
+        for (const unit of loc.units) {
+          if (this.expandedUnitIds.has(unit.unitId)) {
+            result.push(unit);
+          }
+        }
+      }
+      return result;
+    },
     selectedLocation(): StorageLocation | null {
       if (this.selectedLocationId === null) {
         return null;
@@ -1462,58 +1920,11 @@ export default defineComponent({
       if (!this.selectedUnit || !this.selectedUnit.shelvesCount) {
         return [];
       }
-      return Array.from({ length: this.selectedUnit.shelvesCount }, (_, i) => ({
-        index: i + 1,
-        label: `Полка ${i + 1}`,
-      }));
+      return this.getUnitShelves(this.selectedUnit);
     },
-    schemeShelves(): Array<{
-      key: string;
-      label: string;
-      index: number | null;
-      containers: StorageContainer[];
-    }> {
-      if (!this.selectedUnit) {
-        return [];
-      }
-      const shelves: Array<{
-        key: string;
-        label: string;
-        index: number | null;
-        containers: StorageContainer[];
-      }> = this.unitShelves.map((shelf) => ({
-        key: `shelf-${shelf.index}`,
-        label: shelf.label,
-        index: shelf.index,
-        containers: this.selectedUnit
-          ? this.selectedUnit.containers.filter((container) => {
-              const parsed = this.parseShelfNumber(container.shelfNumber);
-              return parsed === shelf.index;
-            })
-          : [],
-      }));
-      const withoutShelf = this.selectedUnit.containers.filter((container) => {
-        return this.parseShelfNumber(container.shelfNumber) === null;
-      });
-      if (withoutShelf.length > 0) {
-        shelves.push({
-          key: "shelf-unknown",
-          label: "Полка не указана",
-          index: null,
-          containers: withoutShelf,
-        });
-      }
-      return shelves;
-    },
-    filteredContainers(): StorageContainer[] {
-      if (!this.selectedUnit || !this.selectedShelfIndex) {
-        return [];
-      }
-      const targetIndex = this.selectedShelfIndex;
-      return this.selectedUnit.containers.filter((container) => {
-        const parsed = this.parseShelfNumber(container.shelfNumber);
-        return parsed === targetIndex;
-      });
+    firstExpandedShelfIndex(): number | null {
+      if (this.expandedShelfIndices.size === 0) return null;
+      return Math.min(...this.expandedShelfIndices);
     },
     drawerContainer(): StorageContainer | null {
       if (!this.selectedUnit || !this.selectedCell) {
@@ -1570,7 +1981,69 @@ export default defineComponent({
     },
   },
   methods: {
-    async fetchLocations() {
+    getNextContainerNumberForShelf(
+      unit: StorageUnit,
+      shelfIndex: number | null
+    ): string {
+      const list = this.getContainersForShelfOrNull(unit, shelfIndex);
+      let maxNum = 0;
+      for (const c of list) {
+        const n = parseInt(String(c.containerNumber ?? ""), 10);
+        if (!Number.isNaN(n) && n > maxNum) maxNum = n;
+      }
+      return String(maxNum + 1);
+    },
+    getSchemeShelvesForUnit(unit: StorageUnit): Array<{
+      key: string;
+      label: string;
+      index: number | null;
+      containers: StorageContainer[];
+    }> {
+      if (!unit) return [];
+      const containers = unit.containers ?? [];
+      const sortByPosition = (a: StorageContainer, b: StorageContainer) => {
+        const aPos = a.shelfPosition ?? Infinity;
+        const bPos = b.shelfPosition ?? Infinity;
+        if (aPos !== bPos) return aPos - bPos;
+        const aVal = a.containerNumber ?? "";
+        const bVal = b.containerNumber ?? "";
+        return String(aVal).localeCompare(String(bVal), undefined, {
+          numeric: true,
+        });
+      };
+      const unitShelvesList = this.getUnitShelves(unit);
+      const shelves: Array<{
+        key: string;
+        label: string;
+        index: number | null;
+        containers: StorageContainer[];
+      }> = unitShelvesList.map((shelf) => ({
+        key: `shelf-${shelf.index}`,
+        label: shelf.label,
+        index: shelf.index,
+        containers: containers
+          .filter((container) => {
+            const parsed = this.parseShelfNumber(container.shelfNumber);
+            return parsed === shelf.index;
+          })
+          .sort(sortByPosition),
+      }));
+      const withoutShelf = containers
+        .filter((container) => {
+          return this.parseShelfNumber(container.shelfNumber) === null;
+        })
+        .sort(sortByPosition);
+      if (withoutShelf.length > 0) {
+        shelves.push({
+          key: "shelf-unknown",
+          label: "Полка не указана",
+          index: null,
+          containers: withoutShelf,
+        });
+      }
+      return shelves;
+    },
+    async fetchLocations(restoreState = false) {
       this.loading = true;
       this.errorMessage = "";
       try {
@@ -1580,6 +2053,9 @@ export default defineComponent({
         ]);
         this.locations = locationsResponse.data;
         this.samples = samplesResponse.data;
+        if (restoreState) {
+          this.restoreStorageViewState();
+        }
         this.ensureSelections();
       } catch (error) {
         console.error("Ошибка при загрузке хранилищ:", error);
@@ -1600,6 +2076,7 @@ export default defineComponent({
           patientsResponse,
           researchesResponse,
           diagnosesResponse,
+          departmentsResponse,
         ] = await Promise.all([
           axios.get("/references/sample-types"),
           axios.get("/references/sample-statuses"),
@@ -1610,6 +2087,7 @@ export default defineComponent({
           axios.get("/patients"),
           axios.get("/researches"),
           axios.get("/references/diagnoses"),
+          axios.get("/references/departments"),
         ]);
         this.sampleTypes = this.sortByNameWithUnknown(
           typesResponse.data,
@@ -1642,6 +2120,7 @@ export default defineComponent({
           (a: DiagnosisRef, b: DiagnosisRef) =>
             a.diagnosisName.localeCompare(b.diagnosisName, "ru-RU")
         );
+        this.departments = departmentsResponse?.data || [];
       } catch (error) {
         console.error("Ошибка при загрузке справочников:", error);
       }
@@ -1863,6 +2342,7 @@ export default defineComponent({
     ): Array<{
       label: string;
       filled: boolean;
+      withdrawn?: boolean;
       sampleBarcode?: string;
       sampleTypeIconUrl?: string | null;
       expiryStatus?: string;
@@ -1881,9 +2361,13 @@ export default defineComponent({
           columns
         );
         const cellData = cellMap.get(label);
+        const withdrawn =
+          cellData?.specimen &&
+          this.isSpecimenWithdrawn(cellData.specimen.sampleStatusId);
         return {
           label,
           filled: cellMap.has(label),
+          withdrawn,
           sampleBarcode: cellData?.specimen.barcode ?? cellData?.sample.barcode,
           sampleTypeIconUrl: cellData?.sample
             ? this.getSampleTypeIconUrl(cellData.sample.sampleTypeId)
@@ -2003,7 +2487,7 @@ export default defineComponent({
           : numbering
           ? ` (${numbering})`
           : "";
-      return `${name}${extra} №${number}`;
+      return `${name}${extra} ${number}`;
     },
     getContainerLabel(containerId: number | null | undefined) {
       if (!containerId) return "—";
@@ -2241,9 +2725,14 @@ export default defineComponent({
     },
     onCellClick(
       container: StorageContainer,
-      cell: { label: string; filled: boolean; sampleBarcode?: string }
+      cell: { label: string; filled: boolean; sampleBarcode?: string },
+      unit?: StorageUnit
     ) {
       this.selectedContainerId = container.containerId;
+      if (unit) {
+        this.selectedLocationId = unit.locationId;
+        this.selectedUnitId = unit.unitId;
+      }
       if (cell.filled) {
         const sample = this.findSampleForCell(container, cell.label);
         this.openSampleDetails(container.containerId, cell.label, sample);
@@ -2362,6 +2851,97 @@ export default defineComponent({
       this.$nextTick(() => {
         this.drawerFormInitializing = false;
       });
+    },
+    getWithdrawnStatusId() {
+      const target = this.sampleStatuses.find(
+        (s) => s.sampleStatusName?.trim().toLowerCase() === "изъят"
+      );
+      return target?.sampleStatusId ?? null;
+    },
+    getExhaustedStatusId() {
+      const target = this.sampleStatuses.find(
+        (s) => s.sampleStatusName?.trim().toLowerCase() === "исчерпан"
+      );
+      return target?.sampleStatusId ?? null;
+    },
+    isSpecimenWithdrawn(sampleStatusId: number | null | undefined): boolean {
+      return sampleStatusId === this.getWithdrawnStatusId();
+    },
+    isSpecimenExhausted(sampleStatusId: number | null | undefined): boolean {
+      return sampleStatusId === this.getExhaustedStatusId();
+    },
+    getDefaultTransactionDateTime(): string {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, "0");
+      const d = String(now.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}T08:00`;
+    },
+    openSpecimenActionDrawer(
+      specimen: Specimen,
+      type: "withdraw" | "return" | "exhaust"
+    ) {
+      this.specimenActionSpecimen = specimen;
+      this.specimenActionModalType = type;
+      this.specimenActionForm = {
+        transactionDate: this.getDefaultTransactionDateTime(),
+        departmentId: null,
+        purpose: "",
+        notes: "",
+      };
+      this.specimenActionModalOpen = true;
+    },
+    closeSpecimenActionModal() {
+      this.specimenActionModalOpen = false;
+      this.specimenActionSpecimen = null;
+      this.specimenActionModalType = null;
+    },
+    async submitSpecimenAction() {
+      if (!this.specimenActionSpecimen || !this.specimenActionModalType) return;
+      const url =
+        this.specimenActionModalType === "withdraw"
+          ? `/specimens/${this.specimenActionSpecimen.specimenId}/withdraw`
+          : this.specimenActionModalType === "return"
+          ? `/specimens/${this.specimenActionSpecimen.specimenId}/return`
+          : `/specimens/${this.specimenActionSpecimen.specimenId}/exhaust`;
+      try {
+        await axios.post(url, {
+          transactionDate: this.specimenActionForm.transactionDate,
+          departmentId: this.specimenActionForm.departmentId,
+          purpose: this.specimenActionForm.purpose || null,
+          notes: this.specimenActionForm.notes || null,
+        });
+        this.closeSpecimenActionModal();
+        await this.fetchLocations();
+        this.closeSampleDrawer();
+      } catch {
+        this.errorMessage = "Ошибка при выполнении операции";
+      }
+    },
+    async openSpecimenJournalDrawer(specimen: Specimen) {
+      this.specimenJournalSpecimen = specimen;
+      this.specimenJournalModalOpen = true;
+      this.specimenJournalLoading = true;
+      this.specimenJournalTransactions = [];
+      try {
+        const { data } = await axios.get(
+          `/specimens/${specimen.specimenId}/transactions`
+        );
+        this.specimenJournalTransactions = data;
+      } catch {
+        this.specimenJournalTransactions = [];
+      } finally {
+        this.specimenJournalLoading = false;
+      }
+    },
+    closeSpecimenJournalModal() {
+      this.specimenJournalModalOpen = false;
+      this.specimenJournalSpecimen = null;
+      this.specimenJournalTransactions = [];
+    },
+    formatSpecimenTxDate(dt: string): string {
+      if (!dt) return "—";
+      return new Date(dt).toLocaleString("ru-RU");
     },
     closeSampleDrawer() {
       this.sampleDrawerOpen = false;
@@ -2550,22 +3130,106 @@ export default defineComponent({
         );
       });
     },
+    getUnitShelves(unit: StorageUnit): Array<{ index: number; label: string }> {
+      if (!unit || !unit.shelvesCount) return [];
+      return Array.from({ length: unit.shelvesCount }, (_, i) => ({
+        index: i + 1,
+        label: `Полка ${i + 1}`,
+      }));
+    },
     getContainersForShelf(shelfIndex: number) {
-      if (!this.selectedUnit) {
-        return [];
-      }
-      return this.selectedUnit.containers
+      if (!this.selectedUnit) return [];
+      return this.getContainersForShelfInUnit(this.selectedUnit, shelfIndex);
+    },
+    getContainersWithoutShelf(unit: StorageUnit) {
+      if (!unit) return [];
+      const containers = unit.containers ?? [];
+      return containers
         .filter((container) => {
-          const parsed = this.parseShelfNumber(container.shelfNumber);
-          return parsed === shelfIndex;
+          return this.parseShelfNumber(container.shelfNumber) === null;
         })
         .sort((a, b) => {
+          const aPos = a.shelfPosition ?? Infinity;
+          const bPos = b.shelfPosition ?? Infinity;
+          if (aPos !== bPos) return aPos - bPos;
           const aVal = a.containerNumber ?? "";
           const bVal = b.containerNumber ?? "";
           return String(aVal).localeCompare(String(bVal), undefined, {
             numeric: true,
           });
         });
+    },
+    saveStorageViewState() {
+      try {
+        const state = {
+          selectedLocationId: this.selectedLocationId,
+          showLocationDetailsId: this.showLocationDetailsId,
+          selectedUnitId: this.selectedUnitId,
+          expandedUnitIds: Array.from(this.expandedUnitIds),
+          expandedShelfIndices: Array.from(this.expandedShelfIndices),
+          selectedContainerId: this.selectedContainerId,
+          sampleDrawerOpen: this.sampleDrawerOpen,
+          sampleDrawerMode: this.sampleDrawerMode,
+          selectedCell: this.selectedCell,
+          selectedSampleId: this.selectedSample?.sampleId ?? null,
+          selectedSpecimenId: this.selectedSpecimen?.specimenId ?? null,
+        };
+        sessionStorage.setItem(
+          "biobank_storage_view_state",
+          JSON.stringify(state)
+        );
+      } catch {
+        // ignore
+      }
+    },
+    restoreStorageViewState() {
+      try {
+        const raw = sessionStorage.getItem("biobank_storage_view_state");
+        if (!raw) return;
+        const state = JSON.parse(raw);
+        this.isRestoringStorageState = true;
+        this.selectedLocationId = state.selectedLocationId ?? null;
+        this.showLocationDetailsId = state.showLocationDetailsId ?? null;
+        this.selectedUnitId = state.selectedUnitId ?? null;
+        const unitIds =
+          state.expandedUnitIds ??
+          (state.selectedUnitId != null ? [state.selectedUnitId] : []);
+        this.expandedUnitIds = new Set(unitIds);
+        const shelfIndices =
+          state.expandedShelfIndices ??
+          (state.selectedShelfIndex != null ? [state.selectedShelfIndex] : []);
+        this.expandedShelfIndices = new Set(shelfIndices);
+        this.selectedContainerId = state.selectedContainerId ?? null;
+        if (
+          state.sampleDrawerOpen &&
+          state.selectedCell &&
+          state.sampleDrawerMode === "details"
+        ) {
+          this.sampleDrawerOpen = true;
+          this.sampleDrawerMode = "details";
+          this.selectedCell = {
+            containerId: state.selectedCell.containerId,
+            label: state.selectedCell.label,
+          };
+          const sample = (this.samples as Sample[]).find(
+            (s) => s.sampleId === state.selectedSampleId
+          );
+          this.selectedSample = sample ?? null;
+          if (sample && state.selectedSpecimenId) {
+            const specimen = (sample.specimens || []).find(
+              (sp: Specimen) => sp.specimenId === state.selectedSpecimenId
+            );
+            this.selectedSpecimen = specimen ?? null;
+          } else {
+            this.selectedSpecimen = null;
+          }
+        }
+        this.$nextTick(() => {
+          this.isRestoringStorageState = false;
+        });
+      } catch {
+        // ignore
+      }
     },
     ensureSelections() {
       if (this.selectedLocationId) {
@@ -2575,9 +3239,22 @@ export default defineComponent({
         if (!exists) {
           this.selectedLocationId = null;
           this.selectedUnitId = null;
-          this.selectedShelfIndex = null;
+          this.expandedUnitIds = new Set();
+          this.expandedShelfIndices = new Set();
           this.selectedContainerId = null;
         }
+      }
+      const allUnitIds = new Set<number>();
+      for (const loc of this.locations) {
+        for (const unit of loc.units) {
+          allUnitIds.add(unit.unitId);
+        }
+      }
+      const validExpandedUnits = [...this.expandedUnitIds].filter((id) =>
+        allUnitIds.has(id)
+      );
+      if (validExpandedUnits.length !== this.expandedUnitIds.size) {
+        this.expandedUnitIds = new Set(validExpandedUnits);
       }
       if (this.selectedLocationId && this.selectedUnitId) {
         const location = this.locations.find(
@@ -2588,17 +3265,17 @@ export default defineComponent({
           false;
         if (!unitExists) {
           this.selectedUnitId = null;
-          this.selectedShelfIndex = null;
+          this.expandedShelfIndices = new Set();
           this.selectedContainerId = null;
         }
       }
-      if (this.selectedUnitId && this.selectedShelfIndex) {
-        const exists = this.unitShelves.some(
-          (shelf) => shelf.index === this.selectedShelfIndex
+      if (this.selectedUnitId && this.expandedShelfIndices.size > 0) {
+        const validIndices = this.unitShelves.map((s) => s.index);
+        const filtered = [...this.expandedShelfIndices].filter((i) =>
+          validIndices.includes(i)
         );
-        if (!exists) {
-          this.selectedShelfIndex = null;
-          this.selectedContainerId = null;
+        if (filtered.length !== this.expandedShelfIndices.size) {
+          this.expandedShelfIndices = new Set(filtered);
         }
       }
       if (this.selectedUnitId && this.selectedContainerId) {
@@ -2631,64 +3308,182 @@ export default defineComponent({
         : "Показать дополнительную информацию";
     },
     selectUnit(unitId: number) {
-      this.selectedUnitId = this.selectedUnitId === unitId ? null : unitId;
+      const next = new Set(this.expandedUnitIds);
+      if (next.has(unitId)) {
+        next.delete(unitId);
+      } else {
+        next.add(unitId);
+      }
+      this.expandedUnitIds = next;
+      this.selectedUnitId = next.size > 0 ? unitId : null;
     },
     selectShelf(index: number) {
-      this.selectedShelfIndex =
-        this.selectedShelfIndex === index ? null : index;
+      const next = new Set(this.expandedShelfIndices);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      this.expandedShelfIndices = next;
     },
     selectContainer(containerId: number) {
       this.selectedContainerId =
         this.selectedContainerId === containerId ? null : containerId;
     },
-    onDragStart(containerId: number, shelfIndex: number | null) {
-      if (!shelfIndex) {
-        return;
-      }
+    onDragStart(
+      event: DragEvent,
+      containerId: number,
+      shelfIndex: number | null,
+      unitId?: number
+    ) {
       this.dragContainerId = containerId;
       this.dragSourceShelfIndex = shelfIndex;
+      this.dragSourceUnitId = unitId ?? null;
+      if (event.dataTransfer) {
+        event.dataTransfer.setData("text/plain", String(containerId));
+        event.dataTransfer.effectAllowed = "move";
+      }
     },
     onDragOver(event: DragEvent) {
       event.preventDefault();
     },
-    async onDropOnShelf(targetShelfIndex: number) {
-      if (!this.dragContainerId || !this.selectedUnit) {
+    setDragDropTarget(
+      unitId: number,
+      shelfIndex: number | null,
+      beforeContainerId: number | null
+    ) {
+      this.cancelDragLeaveClear();
+      this.dragDropTarget = { unitId, shelfIndex, beforeContainerId };
+    },
+    clearDragDropTarget() {
+      this.dragDropTarget = null;
+    },
+    onDragLeaveDropZone() {
+      if (this.dragLeaveClearTimer) {
+        clearTimeout(this.dragLeaveClearTimer);
+      }
+      this.dragLeaveClearTimer = setTimeout(() => {
+        this.dragLeaveClearTimer = null;
+        this.clearDragDropTarget();
+      }, 50);
+    },
+    cancelDragLeaveClear() {
+      if (this.dragLeaveClearTimer) {
+        clearTimeout(this.dragLeaveClearTimer);
+        this.dragLeaveClearTimer = null;
+      }
+    },
+    async onDropBetween(
+      unitId: number,
+      shelfIndex: number | null,
+      beforeContainerId: number | null
+    ) {
+      this.cancelDragLeaveClear();
+      this.clearDragDropTarget();
+      if (!this.dragContainerId) return;
+      if (this.dragSourceUnitId != null && this.dragSourceUnitId !== unitId) {
+        this.errorMessage =
+          "Перемещение контейнера между хранилищами пока не поддерживается";
         return;
       }
-      await this.moveContainer(this.dragContainerId, targetShelfIndex, null);
+      const unit = this.getUnitById(unitId);
+      if (!unit) return;
+      await this.moveContainer(
+        unit,
+        this.dragContainerId,
+        shelfIndex,
+        beforeContainerId
+      );
     },
-    async onDropOnContainer(
-      targetShelfIndex: number,
-      targetContainerId: number
-    ) {
-      if (!this.dragContainerId || !this.selectedUnit) {
+    async onDropOnShelfForUnit(unit: StorageUnit, targetShelfIndex: number) {
+      this.cancelDragLeaveClear();
+      if (!this.dragContainerId) return;
+      if (
+        this.dragSourceUnitId != null &&
+        this.dragSourceUnitId !== unit.unitId
+      ) {
+        this.errorMessage =
+          "Перемещение контейнера между хранилищами пока не поддерживается";
         return;
       }
       await this.moveContainer(
+        unit,
+        this.dragContainerId,
+        targetShelfIndex,
+        null
+      );
+    },
+    async onDropOnContainer(
+      unitId: number,
+      targetShelfIndex: number | null,
+      targetContainerId: number
+    ) {
+      this.cancelDragLeaveClear();
+      if (!this.dragContainerId) return;
+      const unit = this.getUnitById(unitId);
+      if (!unit) return;
+      await this.moveContainer(
+        unit,
         this.dragContainerId,
         targetShelfIndex,
         targetContainerId
       );
     },
+    getUnitById(unitId: number): StorageUnit | null {
+      for (const loc of this.locations) {
+        const unit = loc.units.find((u) => u.unitId === unitId);
+        if (unit) return unit;
+      }
+      return null;
+    },
+    getContainersForShelfOrNull(
+      unit: StorageUnit,
+      shelfIndex: number | null
+    ): StorageContainer[] {
+      if (!unit) return [];
+      if (shelfIndex === null) {
+        return this.getContainersWithoutShelf(unit);
+      }
+      return this.getContainersForShelfInUnit(unit, shelfIndex);
+    },
+    getContainersForShelfInUnit(
+      unit: StorageUnit,
+      shelfIndex: number
+    ): StorageContainer[] {
+      if (!unit) return [];
+      const containers = unit.containers ?? [];
+      return containers
+        .filter((container) => {
+          const parsed = this.parseShelfNumber(container.shelfNumber);
+          return parsed === shelfIndex;
+        })
+        .sort((a, b) => {
+          const aPos = a.shelfPosition ?? Infinity;
+          const bPos = b.shelfPosition ?? Infinity;
+          if (aPos !== bPos) return aPos - bPos;
+          const aVal = a.containerNumber ?? "";
+          const bVal = b.containerNumber ?? "";
+          return String(aVal).localeCompare(String(bVal), undefined, {
+            numeric: true,
+          });
+        });
+    },
     async moveContainer(
+      unit: StorageUnit,
       containerId: number,
-      targetShelfIndex: number,
+      targetShelfIndex: number | null,
       beforeContainerId: number | null
     ) {
-      if (!this.selectedUnit) {
-        return;
-      }
       const sourceShelf = this.dragSourceShelfIndex;
-      if (!sourceShelf) {
-        return;
-      }
-      const sourceList = this.getContainersForShelf(sourceShelf).filter(
-        (container) => container.containerId !== containerId
-      );
-      const targetList = this.getContainersForShelf(targetShelfIndex).filter(
-        (container) => container.containerId !== containerId
-      );
-      const moved = this.selectedUnit.containers.find(
+      const sourceList = this.getContainersForShelfOrNull(
+        unit,
+        sourceShelf
+      ).filter((container) => container.containerId !== containerId);
+      const targetList = this.getContainersForShelfOrNull(
+        unit,
+        targetShelfIndex
+      ).filter((container) => container.containerId !== containerId);
+      const moved = (unit.containers ?? []).find(
         (container) => container.containerId === containerId
       );
       if (!moved) {
@@ -2707,30 +3502,48 @@ export default defineComponent({
         targetList.push(moved);
       }
       const updates: StorageContainer[] = [];
-      const applyNumbers = (
+      const applyPosition = (
         list: StorageContainer[],
-        shelfIndexValue: number
+        shelfIndexValue: number | null
       ) => {
         list.forEach((container, index) => {
           const nextShelf = shelfIndexValue;
-          const nextNumber = String(index + 1);
+          const nextPosition = index + 1;
           if (
             container.shelfNumber !== nextShelf ||
-            (container.containerNumber ?? "") !== nextNumber
+            (container.shelfPosition ?? 0) !== nextPosition
           ) {
             container.shelfNumber = nextShelf;
-            container.containerNumber = nextNumber;
+            container.shelfPosition = nextPosition;
             updates.push(container);
           }
         });
       };
-      applyNumbers(sourceList, sourceShelf);
-      applyNumbers(targetList, targetShelfIndex);
-      await this.persistContainerUpdates(updates);
-      await this.fetchLocations();
-      this.dragContainerId = null;
-      this.dragSourceShelfIndex = null;
-      this.selectedShelfIndex = targetShelfIndex;
+      applyPosition(sourceList, sourceShelf);
+      applyPosition(targetList, targetShelfIndex);
+      try {
+        await this.persistContainerUpdates(updates);
+        await this.fetchLocations();
+        this.successMessage = "Контейнер перемещён";
+      } catch (error: unknown) {
+        console.error("Ошибка при перемещении контейнера:", error);
+        this.errorMessage = this.resolveErrorMessage(
+          error,
+          "Не удалось переместить контейнер"
+        );
+      } finally {
+        this.cancelDragLeaveClear();
+        this.dragContainerId = null;
+        this.dragSourceShelfIndex = null;
+        this.dragSourceUnitId = null;
+        this.dragDropTarget = null;
+      }
+      if (targetShelfIndex != null) {
+        this.expandedShelfIndices = new Set([
+          ...this.expandedShelfIndices,
+          targetShelfIndex,
+        ]);
+      }
       this.selectedContainerId = containerId;
     },
     async persistContainerUpdates(containers: StorageContainer[]) {
@@ -2739,6 +3552,7 @@ export default defineComponent({
           templateId: container.templateId,
           containerNumber: container.containerNumber || null,
           shelfNumber: container.shelfNumber,
+          shelfPosition: container.shelfPosition ?? null,
         });
       }
     },
@@ -2769,12 +3583,26 @@ export default defineComponent({
       };
       this.modalOpen = true;
     },
+    openContainerModalForUnit(unit: StorageUnit) {
+      this.selectedUnitId = unit.unitId;
+      this.openContainerModal();
+    },
     openContainerModal() {
       if (!this.selectedUnitId) {
         this.errorMessage = "Сначала выберите хранилище";
         return;
       }
-      const shelfNum = this.selectedShelfIndex ?? null;
+      const unit = this.getUnitById(this.selectedUnitId);
+      const shelfNum = unit
+        ? this.getUnitShelves(unit).length > 0
+          ? this.expandedShelfIndices.size > 0
+            ? Math.min(...this.expandedShelfIndices)
+            : 1
+          : null
+        : null;
+      const nextNumber = unit
+        ? this.getNextContainerNumberForShelf(unit, shelfNum)
+        : "1";
       this.modalType = "container";
       this.modalMode = "create";
       this.modalTitle = "Добавить контейнер";
@@ -2784,7 +3612,7 @@ export default defineComponent({
         rowsCount: 1,
         columnsCount: 1,
         numberingType: "LETTER_DIGIT",
-        containerNumber: "",
+        containerNumber: nextNumber,
         shelfNumber: shelfNum,
       };
       this.modalOpen = true;
@@ -2811,6 +3639,67 @@ export default defineComponent({
       this.modalOpen = false;
       this.modalType = null;
       this.modalTitle = "";
+    },
+    resetStorageModalForm() {
+      if (this.modalType === "location") {
+        this.modalLocation = {
+          locationName: "",
+          address: "",
+          roomNumber: "",
+          description: "",
+        };
+      } else if (this.modalType === "unit") {
+        this.modalUnit = {
+          unitTypeId: null,
+          unitName: "",
+          shelvesCount: null,
+        };
+      } else if (this.modalType === "container") {
+        const unit = this.getUnitById(this.selectedUnitId ?? 0);
+        const shelfNum =
+          this.firstExpandedShelfIndex ??
+          (unit && this.getUnitShelves(unit).length > 0 ? 1 : null) ??
+          null;
+        const nextNumber = unit
+          ? this.getNextContainerNumberForShelf(unit, shelfNum)
+          : "1";
+        this.modalContainer = {
+          templateId: null,
+          templateName: "",
+          rowsCount: 1,
+          columnsCount: 1,
+          numberingType: "LETTER_DIGIT",
+          containerNumber: nextNumber,
+          shelfNumber: shelfNum,
+        };
+      }
+      this.errorMessage = "";
+    },
+    resetDrawerSampleForm() {
+      if (!this.selectedCell) return;
+      const storageStatusId = this.getStorageStatusId();
+      this.drawerSampleForm = {
+        visitId: null,
+        barcode: "",
+        sampleTypeId: null,
+        initialQuantity: 1,
+        currentQuantity: 1,
+        recommendedStorageMonths: null,
+        actualStorageMonths: null,
+        expiryStatus: "",
+        containerId: this.selectedCell.containerId,
+        collectionDate: "",
+        specimens: [
+          {
+            barcode: "",
+            sampleStatusId: storageStatusId,
+            containerId: this.selectedCell.containerId,
+            positionInContainer: this.selectedCell.label,
+          },
+        ],
+      };
+      this.syncDrawerSpecimens();
+      this.errorMessage = "";
     },
     openUnitTypeRefModal(presetId: number | null = null) {
       this.unitTypeRefModalId = presetId;
@@ -2907,6 +3796,12 @@ export default defineComponent({
     },
     closeTemplateRefModal() {
       this.templateRefModalOpen = false;
+    },
+    resetTemplateRefForm() {
+      this.templateRefModalName = "";
+      this.templateRefModalRows = 1;
+      this.templateRefModalCols = 1;
+      this.templateRefModalNumbering = "LETTER_DIGIT";
     },
     async submitTemplateRefModal() {
       if (!this.templateRefModalName.trim()) return;
@@ -3051,13 +3946,16 @@ export default defineComponent({
         this.errorMessage = "Укажите номер контейнера";
         return;
       }
-      if (this.modalContainer.shelfNumber == null) {
+      const hasShelves =
+        this.selectedUnit?.shelvesCount != null &&
+        this.selectedUnit.shelvesCount > 0;
+      if (hasShelves && this.modalContainer.shelfNumber == null) {
         this.errorMessage = "Укажите номер полки";
         return;
       }
       const payload: Record<string, unknown> = {
         containerNumber: this.modalContainer.containerNumber.trim() || null,
-        shelfNumber: this.modalContainer.shelfNumber,
+        shelfNumber: hasShelves ? this.modalContainer.shelfNumber : null,
       };
       if (this.modalContainer.templateId) {
         payload.templateId = this.modalContainer.templateId;
@@ -3200,6 +4098,7 @@ export default defineComponent({
           templateId: this.modalContainer.templateId,
           containerNumber: this.modalContainer.containerNumber || null,
           shelfNumber: this.modalContainer.shelfNumber,
+          shelfPosition: this.selectedContainer?.shelfPosition ?? null,
         });
         this.successMessage = "Контейнер обновлен";
         this.closeModal();
@@ -3211,15 +4110,22 @@ export default defineComponent({
         );
       }
     },
-    containerPath(container: StorageContainer, shelfLabel: string): string {
-      if (!this.selectedLocation || !this.selectedUnit) {
-        return "";
-      }
+    containerPath(
+      container: StorageContainer,
+      shelfLabel: string,
+      unit?: StorageUnit | null
+    ): string {
+      const u = unit ?? this.selectedUnit;
+      if (!u) return "";
+      const location = this.locations.find(
+        (l) => l.locationId === u.locationId
+      );
+      const locationName = location?.locationName ?? "";
       const containerName = container.templateName || "Контейнер";
       const number = container.containerNumber ?? "—";
-      return `${this.selectedLocation.locationName} → ${
-        this.selectedUnit.unitName
-      } → ${shelfLabel} → ${containerName} ${number ? `№${number}` : ""}`;
+      return `${locationName} → ${
+        u.unitName
+      } → ${shelfLabel} → ${containerName}${number ? ` ${number}` : ""}`;
     },
     async deleteLocation() {
       if (!this.selectedLocationId) {
@@ -3236,7 +4142,7 @@ export default defineComponent({
         this.successMessage = "Локация удалена";
         this.selectedLocationId = null;
         this.selectedUnitId = null;
-        this.selectedShelfIndex = null;
+        this.expandedShelfIndices = new Set();
         this.selectedContainerId = null;
         await this.fetchLocations();
       } catch (error: unknown) {
@@ -3260,7 +4166,7 @@ export default defineComponent({
         await axios.delete(`/storage/units/${this.selectedUnitId}`);
         this.successMessage = "Хранилище удалено";
         this.selectedUnitId = null;
-        this.selectedShelfIndex = null;
+        this.expandedShelfIndices = new Set();
         this.selectedContainerId = null;
         await this.fetchLocations();
       } catch (error: unknown) {
@@ -3312,12 +4218,19 @@ export default defineComponent({
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
 }
 
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
 h2 {
   text-align: center;
   color: var(--text-primary);
+  margin: 0;
 }
 
 .storage-layout {
@@ -3436,6 +4349,85 @@ h2 {
   color: #f2ede6;
   border-color: #6e5a4b;
   box-shadow: var(--shadow);
+}
+
+.tree-with-drop-zones {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.drop-zone {
+  min-height: 4px;
+  margin: 2px 0;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.drop-zone:hover,
+.drop-zone-active {
+  min-height: 8px;
+  background-color: rgba(110, 90, 75, 0.15);
+}
+
+.drop-indicator {
+  height: 4px;
+  background-color: var(--accent);
+  border-radius: 2px;
+  margin: 2px 8px;
+}
+
+.drop-zone-end {
+  flex: 0 0 auto;
+}
+
+.shelf-containers-with-drop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.drop-zone-scheme {
+  min-width: 16px;
+  min-height: 60px;
+  flex: 0 0 16px;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+  cursor: default;
+}
+
+.drop-zone-scheme:hover,
+.drop-zone-scheme.drop-zone-active {
+  min-width: 20px;
+  background-color: rgba(110, 90, 75, 0.25);
+}
+
+.drop-indicator-scheme {
+  width: 4px;
+  min-height: 60px;
+  background-color: var(--accent);
+  border-radius: 2px;
+  margin: 0 auto;
+}
+
+.drop-zone-scheme-end {
+  flex: 1 1 auto;
+  min-width: 20px;
+}
+
+.scheme-unit-block {
+  margin-bottom: 24px;
+}
+
+.scheme-unit-block:last-child {
+  margin-bottom: 0;
+}
+
+.scheme-unit-title {
+  margin: 0 0 12px 0;
+  font-size: 1rem;
+  color: var(--text-primary);
 }
 
 .form-grid {
@@ -3699,6 +4691,10 @@ h2 {
   box-shadow: 0 0 0 2px #d94841;
 }
 
+.scheme-cell.cell-withdrawn {
+  opacity: 0.5;
+}
+
 .scheme-cell-icon-wrap {
   width: 28px;
   height: 28px;
@@ -3739,9 +4735,22 @@ h2 {
 
 .drawer-header {
   display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.drawer-header-top {
+  display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
+}
+
+.drawer-path-block {
+  width: 100%;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
 }
 
 .drawer-title {
@@ -3764,13 +4773,14 @@ h2 {
 .drawer-subtitle {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 0.85rem;
+  font-size: 1rem;
+  word-break: break-word;
 }
 
 .drawer-meta {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: 1rem;
 }
 
 .drawer-body {
@@ -3818,13 +4828,36 @@ h2 {
 
 .tube-row {
   display: grid;
-  grid-template-columns: 100px 1fr 140px 120px;
+  grid-template-columns: 100px 1fr 120px;
   gap: 8px;
   align-items: center;
 }
 
 .tube-label {
   color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.drawer-action-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.journal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.journal-table th,
+.journal-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.journal-table thead th {
+  background: #f3ede4;
   font-weight: 600;
 }
 

@@ -242,12 +242,14 @@ COMMENT ON COLUMN container_type_templates.numbering_type IS 'LETTER_DIGIT, DIGI
 //
 
 -- Контейнеры (коробки, штативы). current_samples_count обновляется в коде (SampleService).
+-- shelf_position — порядок на полке (для перемещения без смены номера).
 CREATE TABLE IF NOT EXISTS storage_containers (
     container_id SERIAL PRIMARY KEY,
     container_number VARCHAR(255),
     current_samples_count INT NOT NULL DEFAULT 0 CHECK (current_samples_count >= 0),
     unit_id INT NOT NULL,
     shelf_number INT,
+    shelf_position INT,
     template_id INT NOT NULL,
 
     CONSTRAINT fk_storage_containers_unit

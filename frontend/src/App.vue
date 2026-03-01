@@ -10,10 +10,36 @@
         <li><router-link to="/patients">Пациенты</router-link></li>
       </ul>
       <div class="nav-user">
-        <router-link class="btn btn-secondary btn-sm" to="/profile">
-          Профиль
-        </router-link>
-        <button class="btn btn-secondary btn-sm" @click="logout">Выйти</button>
+        <div class="profile-menu">
+          <router-link
+            class="btn btn-secondary btn-sm nav-user-btn"
+            to="/profile"
+          >
+            Профиль
+          </router-link>
+          <div class="profile-dropdown" role="menu" aria-label="Профиль">
+            <router-link class="btn btn-sm profile-dropdown-btn" to="/profile">
+              Информация о профиле
+            </router-link>
+            <router-link
+              v-if="canManageUsers"
+              class="btn btn-sm profile-dropdown-btn"
+              to="/users"
+            >
+              Пользователи системы
+            </router-link>
+            <router-link
+              v-if="canManageRoles"
+              class="btn btn-sm profile-dropdown-btn"
+              to="/roles"
+            >
+              Роли пользователей
+            </router-link>
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-sm nav-user-btn" @click="logout">
+          Выход
+        </button>
       </div>
     </nav>
 
@@ -24,7 +50,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, computed } from "vue";
+import { defineComponent, computed, onMounted } from "vue";
 import { RouterLink, RouterView } from "vue-router";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -38,8 +64,15 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const router = useRouter();
+    onMounted(() => {
+      if (store.getters.isAuthenticated) {
+        store.dispatch("refreshPermissions");
+      }
+    });
     return {
       isAuthenticated: computed(() => store.getters.isAuthenticated),
+      canManageUsers: computed(() => store.getters.canManageUsers),
+      canManageRoles: computed(() => store.getters.canManageRoles),
       logout: () => {
         store.commit("clearAuth");
         router.push("/login").catch(() => undefined);
@@ -118,13 +151,72 @@ body {
   align-items: center;
   gap: 1rem;
 }
+.nav-user-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 1rem;
+  font-weight: 600;
+  line-height: 1;
+}
 .user-name {
   font-size: 0.9rem;
   color: var(--text-secondary);
 }
 .btn-sm {
-  padding: 0.4rem 0.8rem;
+  height: 34px;
+  padding: 0 0.8rem;
   font-size: 0.85rem;
+  box-sizing: border-box;
+}
+
+.profile-menu {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.profile-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  min-width: 240px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 0.4rem;
+  margin-top: 8px;
+  display: none;
+  z-index: 20;
+}
+.profile-dropdown::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -8px;
+  height: 8px;
+}
+.profile-menu:hover .profile-dropdown,
+.profile-menu:focus-within .profile-dropdown {
+  display: block;
+}
+.profile-dropdown-btn {
+  width: 100%;
+  justify-content: flex-start;
+  white-space: nowrap;
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  background-color: var(--surface);
+  border-color: transparent;
+  color: var(--text-primary);
+  box-shadow: none;
+  transform: none;
+}
+.profile-dropdown-btn:hover {
+  background-color: var(--border);
+  color: var(--text-primary);
 }
 
 .main-content {
@@ -139,16 +231,14 @@ body {
   border-radius: 8px;
   font-size: 0.95rem;
   font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
   text-decoration: none;
-  transition: background-color 0.25s ease, color 0.25s ease,
-    box-shadow 0.25s ease, transform 0.25s ease;
-}
-
-a.btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: background-color 0.25s ease, color 0.25s ease,
+    box-shadow 0.25s ease, transform 0.25s ease;
 }
 
 .btn:disabled {
@@ -176,6 +266,22 @@ a.btn {
 .btn-secondary:hover:not(:disabled) {
   background-color: var(--accent);
   color: var(--text-primary);
+}
+
+.btn-nowrap {
+  white-space: nowrap;
+}
+
+.btn-icon-danger {
+  color: #7f3f32;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  flex-shrink: 0;
+}
+.btn-icon-danger svg {
+  width: 18px;
+  height: 18px;
 }
 
 select.form-control {

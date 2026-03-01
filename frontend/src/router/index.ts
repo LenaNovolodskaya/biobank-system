@@ -11,6 +11,7 @@ import Register from "@/views/Register.vue";
 import UserList from "@/views/UserList.vue";
 import RoleList from "@/views/RoleList.vue";
 import ProfileView from "@/views/ProfileView.vue";
+import UserProfileView from "@/views/UserProfileView.vue";
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -71,6 +72,12 @@ const routes: Array<RouteRecordRaw> = [
     meta: { requiresUserManage: true },
   },
   {
+    path: "/users/:userId",
+    name: "UserProfile",
+    component: UserProfileView,
+    meta: { requiresUserManage: true },
+  },
+  {
     path: "/roles",
     name: "RoleList",
     component: RoleList,
@@ -86,15 +93,9 @@ const router = createRouter({
 router.beforeEach((to, _from, next) => {
   const isPublic = to.matched.some((r) => r.meta?.public);
   const isAuthenticated = store.getters.isAuthenticated;
-  const requiresUserManage = to.matched.some((r) => r.meta?.requiresUserManage);
-  const requiresRoleManage = to.matched.some((r) => r.meta?.requiresRoleManage);
 
   if (!isPublic && !isAuthenticated) {
     next({ path: "/login" });
-  } else if (requiresUserManage && !store.getters.canManageUsers) {
-    next({ path: "/" });
-  } else if (requiresRoleManage && !store.getters.canManageRoles) {
-    next({ path: "/" });
   } else {
     next();
   }

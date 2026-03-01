@@ -3,6 +3,34 @@
     <div class="page-header">
       <h2>Образцы</h2>
       <button
+        class="icon-button header-button"
+        type="button"
+        title="Экспорт в Excel"
+        aria-label="Экспорт в Excel"
+        @click="exportToExcel"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2 5 5h-5V4zM8 12h2v4H8v-4zm4 0h2v4h-2v-4zm-4 6h2v2H8v-2zm4 0h2v2h-2v-2z"
+            fill="currentColor"
+          />
+        </svg>
+      </button>
+      <button
+        class="icon-button header-button"
+        type="button"
+        title="Импорт из Excel"
+        aria-label="Импорт из Excel"
+        @click="openImportModal"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2 5 5h-5V4zm-2 8h2v4h-2v-4zm4 0h2v4h-2v-4zm-4 6h2v2h-2v-2zm4 0h2v2h-2v-2z"
+            fill="currentColor"
+          />
+        </svg>
+      </button>
+      <button
         v-if="canCreate"
         class="icon-button header-button"
         type="button"
@@ -36,9 +64,9 @@
           <div class="form-group filter-field-group">
             <label>Поле</label>
             <select v-model="row.fieldKey" class="form-control">
-              <option value="">— Выберите поле —</option>
+              <option value="">Выберите поле</option>
               <option
-                v-for="opt in availableFilterFieldsForRow(index)"
+                v-for="opt in availableFilterFieldsForRow()"
                 :key="opt.key"
                 :value="opt.key"
               >
@@ -266,7 +294,14 @@
       :class="{ 'empty-table': !loading && filteredSamples.length === 0 }"
     >
       <p v-if="loading">Загрузка...</p>
-      <div v-else class="table-wrapper" @click="activeHeaderHelp = null">
+      <div
+        v-else
+        ref="tableWrapperRef"
+        class="table-wrapper"
+        :class="{ 'table-wrapper--grabbing': tableIsDragging }"
+        @click="activeHeaderHelp = null"
+        @mousedown="onTableWrapperMouseDown"
+      >
         <table class="samples-table">
           <thead>
             <tr>
@@ -302,7 +337,7 @@
             </tr>
             <template v-for="sample in filteredSamples" :key="sample.sampleId">
               <tr
-                :class="{ selected: sample.sampleId === selectedSampleId }"
+                :class="{ selected: expandedSampleIds.has(sample.sampleId) }"
                 @click="selectSample(sample.sampleId)"
               >
                 <td v-for="column in visibleColumns" :key="column.key">
@@ -372,7 +407,7 @@
                 </td>
               </tr>
               <tr
-                v-if="sample.sampleId === selectedSampleId"
+                v-if="expandedSampleIds.has(sample.sampleId)"
                 class="specimens-details-row"
               >
                 <td :colspan="visibleColumns.length + 2" class="specimens-cell">
@@ -389,6 +424,7 @@
                         <th>Штрихкод</th>
                         <th>Статус</th>
                         <th>Позиция</th>
+                        <th class="specimen-actions-col">Действия</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -408,6 +444,101 @@
                         </td>
                         <td class="specimen-position">
                           {{ specimen.positionInContainer || "—" }}
+                        </td>
+                        <td class="specimen-actions-cell">
+                          <div class="specimen-action-buttons">
+                            <template
+                              v-if="
+                                !isSpecimenExhausted(specimen.sampleStatusId)
+                              "
+                            >
+                              <button
+                                v-if="canUpdate"
+                                type="button"
+                                class="icon-button specimen-action-btn"
+                                :title="
+                                  isSpecimenWithdrawn(specimen.sampleStatusId)
+                                    ? 'Вернуть в хранилище'
+                                    : 'Изъять из хранилища'
+                                "
+                                aria-label="
+                                  {{
+                                    isSpecimenWithdrawn(specimen.sampleStatusId)
+                                      ? 'Вернуть'
+                                      : 'Изъять'
+                                  }}
+                                "
+                                @click.stop="
+                                  openSpecimenActionModal(
+                                    specimen,
+                                    isSpecimenWithdrawn(specimen.sampleStatusId)
+                                      ? 'return'
+                                      : 'withdraw'
+                                  )
+                                "
+                              >
+                                <svg
+                                  v-if="
+                                    isSpecimenWithdrawn(specimen.sampleStatusId)
+                                  "
+                                  viewBox="0 0 24 24"
+                                  class="action-icon return-icon"
+                                >
+                                  <path
+                                    d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"
+                                    fill="currentColor"
+                                  />
+                                </svg>
+                                <svg
+                                  v-else
+                                  viewBox="0 0 24 24"
+                                  class="action-icon withdraw-icon"
+                                >
+                                  <path
+                                    d="M12 19V5l7 7-7 7zM5 19V5l7 7-7 7z"
+                                    fill="currentColor"
+                                  />
+                                </svg>
+                              </button>
+                              <button
+                                v-if="canUpdate"
+                                type="button"
+                                class="icon-button specimen-action-btn"
+                                title="Исчерпан"
+                                aria-label="Исчерпан"
+                                @click.stop="
+                                  openSpecimenActionModal(specimen, 'exhaust')
+                                "
+                              >
+                                <svg
+                                  viewBox="0 0 24 24"
+                                  class="action-icon exhaust-icon"
+                                >
+                                  <path
+                                    d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"
+                                    fill="currentColor"
+                                  />
+                                </svg>
+                              </button>
+                            </template>
+                            <button
+                              type="button"
+                              class="icon-button specimen-action-btn"
+                              title="Журнал операций"
+                              aria-label="Журнал"
+                              @click.stop="openSpecimenJournalModal(specimen)"
+                            >
+                              <svg
+                                viewBox="0 0 24 24"
+                                class="action-icon journal-icon"
+                              >
+                                <path
+                                  d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"
+                                  fill="currentColor"
+                                />
+                              </svg>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     </tbody>
@@ -429,6 +560,17 @@
 
         <form class="form-grid" @submit.prevent="submitModal">
           <div class="form-group">
+            <label for="modalBarcode">Штрихкод *</label>
+            <input
+              id="modalBarcode"
+              v-model="modalSample.barcode"
+              type="text"
+              required
+              class="form-control"
+              placeholder="Введите штрихкод"
+            />
+          </div>
+          <div class="form-group">
             <label for="modalVisitId">Визит (ID) *</label>
             <input
               id="modalVisitId"
@@ -441,23 +583,23 @@
             />
           </div>
           <div class="form-group">
-            <label for="modalBarcode">Штрихкод *</label>
+            <label for="modalCollectionDate">Дата забора образца *</label>
             <input
-              id="modalBarcode"
-              v-model="modalSample.barcode"
-              type="text"
+              id="modalCollectionDate"
+              v-model="modalSample.collectionDate"
+              type="datetime-local"
               required
               class="form-control"
             />
           </div>
           <div class="form-group">
-            <label for="modalSampleType">Тип образца</label>
+            <label for="modalSampleType">Тип образца *</label>
             <select
               id="modalSampleType"
               v-model="modalSample.sampleTypeId"
               class="form-control"
             >
-              <option value="">Не указано</option>
+              <option :value="null">Не указано</option>
               <option
                 v-for="type in sampleTypes"
                 :key="type.sampleTypeId"
@@ -476,56 +618,17 @@
               min="1"
               required
               class="form-control"
+              placeholder="Введите количество проб"
             />
           </div>
           <div class="form-group">
-            <label for="modalCurrentQty">Текущее количество проб *</label>
-            <input
-              id="modalCurrentQty"
-              v-model.number="modalSample.currentQuantity"
-              type="number"
-              min="0"
-              required
-              class="form-control"
-            />
-          </div>
-          <div class="form-group">
-            <label for="modalRecommended">
-              Рекомендуемый срок хранения (в месяцах)
-            </label>
-            <input
-              id="modalRecommended"
-              v-model.number="modalSample.recommendedStorageMonths"
-              type="number"
-              min="0"
-              class="form-control"
-            />
-          </div>
-          <div class="form-group">
-            <label for="modalCollectionDate">Дата забора образца</label>
-            <input
-              id="modalCollectionDate"
-              v-model="modalSample.collectionDate"
-              type="datetime-local"
-              class="form-control"
-            />
-          </div>
-          <div class="form-group">
-            <label>Фактический срок хранения (в месяцах)</label>
-            <div class="readonly-field">{{ actualMonthsPreview }}</div>
-          </div>
-          <div class="form-group">
-            <label>Срок хранения (светофор)</label>
-            <div class="readonly-field">{{ expiryPreview }}</div>
-          </div>
-          <div class="form-group">
-            <label for="modalContainer">Контейнер</label>
+            <label for="modalContainer">Контейнер *</label>
             <select
               id="modalContainer"
               v-model="modalSample.containerId"
               class="form-control"
             >
-              <option value="">Не указано</option>
+              <option :value="null">Не указано</option>
               <option
                 v-for="container in containers"
                 :key="container.containerId"
@@ -548,21 +651,8 @@
                   v-model="specimen.barcode"
                   type="text"
                   class="form-control"
-                  placeholder="Штрихкод образца"
+                  placeholder="Введите штрихкод"
                 />
-                <select
-                  v-model.number="specimen.sampleStatusId"
-                  class="form-control"
-                >
-                  <option :value="null">Не указано</option>
-                  <option
-                    v-for="status in sampleStatuses"
-                    :key="status.sampleStatusId"
-                    :value="status.sampleStatusId"
-                  >
-                    {{ status.sampleStatusName }}
-                  </option>
-                </select>
                 <select
                   v-model="specimen.positionInContainer"
                   class="form-control"
@@ -587,12 +677,219 @@
               Укажите начальное количество проб
             </div>
           </div>
+          <div class="form-group">
+            <label for="modalRecommended">Рекомендуемый срок хранения</label>
+            <input
+              id="modalRecommended"
+              v-model.number="modalSample.recommendedStorageMonths"
+              type="number"
+              min="0"
+              class="form-control"
+              placeholder="Введите срок хранения в месяцах"
+            />
+          </div>
+          <div class="form-group">
+            <label>Фактический срок хранения</label>
+            <div class="readonly-field">{{ actualMonthsPreview }}</div>
+          </div>
+          <div class="form-group">
+            <label>Статус срока хранения</label>
+            <div class="readonly-field">{{ expiryPreview }}</div>
+          </div>
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">
               {{ modalMode === "edit" ? "Обновить" : "Добавить" }}
             </button>
+            <button
+              v-if="modalMode === 'create'"
+              type="button"
+              class="btn btn-secondary"
+              @click="resetSampleForm"
+            >
+              Очистить
+            </button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <div
+      v-if="specimenActionModalOpen"
+      class="modal-overlay"
+      @click.self="closeSpecimenActionModal"
+    >
+      <div class="modal form-modal">
+        <div class="modal-header">
+          <h3>{{ specimenActionModalTitle }}</h3>
+          <button class="btn btn-secondary" @click="closeSpecimenActionModal">
+            Закрыть
+          </button>
+        </div>
+        <form @submit.prevent="submitSpecimenAction">
+          <div class="form-group">
+            <label>Дата и время операции *</label>
+            <input
+              v-model="specimenActionForm.transactionDate"
+              type="datetime-local"
+              required
+              class="form-control"
+            />
+          </div>
+          <div class="form-group">
+            <label>Ответственное подразделение</label>
+            <select
+              v-model.number="specimenActionForm.departmentId"
+              class="form-control"
+            >
+              <option :value="null">Не указано</option>
+              <option
+                v-for="d in departments"
+                :key="d.departmentId"
+                :value="d.departmentId"
+              >
+                {{ d.departmentName }}
+              </option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Цель операции</label>
+            <input
+              v-model="specimenActionForm.purpose"
+              type="text"
+              class="form-control"
+              placeholder="Цель"
+            />
+          </div>
+          <div class="form-group">
+            <label>Дополнительные примечания</label>
+            <textarea
+              v-model="specimenActionForm.notes"
+              class="form-control"
+              rows="3"
+              placeholder="Примечания"
+            />
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Подтвердить</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div
+      v-if="specimenJournalModalOpen"
+      class="modal-overlay"
+      @click.self="closeSpecimenJournalModal"
+    >
+      <div class="modal form-modal">
+        <div class="modal-header">
+          <h3>Журнал операций: {{ specimenJournalSpecimen?.barcode }}</h3>
+          <button class="btn btn-secondary" @click="closeSpecimenJournalModal">
+            Закрыть
+          </button>
+        </div>
+        <div v-if="specimenJournalLoading" class="subtle">Загрузка...</div>
+        <table v-else class="journal-table">
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>Операция</th>
+              <th>Пользователь</th>
+              <th>Подразделение</th>
+              <th>Цель</th>
+              <th>Примечания</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="tx in specimenJournalTransactions"
+              :key="tx.transactionId"
+            >
+              <td>{{ formatSpecimenTxDate(tx.transactionDate) }}</td>
+              <td>{{ tx.transactionTypeName }}</td>
+              <td>{{ tx.userFullName }}</td>
+              <td>{{ tx.departmentName || "—" }}</td>
+              <td>{{ tx.purpose || "—" }}</td>
+              <td>{{ tx.notes || "—" }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p
+          v-if="
+            !specimenJournalLoading && specimenJournalTransactions.length === 0
+          "
+          class="subtle"
+        >
+          Нет записей
+        </p>
+      </div>
+    </div>
+
+    <div
+      v-if="importModalOpen"
+      class="modal-overlay"
+      @click.self="closeImportModal"
+    >
+      <div class="modal form-modal import-modal">
+        <div class="modal-header">
+          <h3>Импорт из Excel</h3>
+          <button class="btn btn-secondary" @click="closeImportModal">
+            Закрыть
+          </button>
+        </div>
+        <div class="form-group">
+          <label>Файл Excel (.xlsx, .xls)</label>
+          <input
+            ref="importFileInputRef"
+            type="file"
+            accept=".xlsx,.xls"
+            class="form-control"
+            @change="onImportFileChange"
+          />
+        </div>
+        <p v-if="importPreviewRows.length > 0" class="import-hint">
+          Найдено {{ importPreviewRows.length }} строк. Для импорта файл должен
+          содержать столбцы: Штрихкод, ID визита, Тип образца (или ID),
+          Контейнер (название или ID), Начальное количество, Текущее количество,
+          Дата забора.
+        </p>
+        <div v-if="importPreviewRows.length > 0" class="import-preview-wrapper">
+          <table class="import-preview-table">
+            <thead>
+              <tr>
+                <th v-for="(_, colIdx) in importPreviewRows[0]" :key="colIdx">
+                  {{ importPreviewHeaders[colIdx] || `Столбец ${colIdx + 1}` }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(row, rowIdx) in importPreviewRows.slice(0, 10)"
+                :key="rowIdx"
+              >
+                <td v-for="(cell, colIdx) in row" :key="colIdx">
+                  {{ cell }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p v-if="importPreviewRows.length > 10" class="import-more-rows">
+            ... и ещё {{ importPreviewRows.length - 10 }} строк
+          </p>
+        </div>
+        <div v-if="importError" class="alert alert-danger">
+          {{ importError }}
+        </div>
+        <div class="form-actions">
+          <button
+            type="button"
+            class="btn btn-primary"
+            :disabled="importPreviewRows.length === 0 || importInProgress"
+            @click="doImport"
+          >
+            {{ importInProgress ? "Импорт..." : "Импортировать" }}
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -602,6 +899,7 @@
 import { defineComponent, computed } from "vue";
 import { useStore } from "vuex";
 import axios from "axios";
+import * as XLSX from "xlsx";
 import BarcodeSvg from "@/components/BarcodeSvg.vue";
 import { getExpiryStatusCode, getExpiryStatusLabel } from "@/utils/expiryUtils";
 
@@ -776,6 +1074,7 @@ export default defineComponent({
       successMessage: "",
       errorMessage: "",
       selectedSampleId: null as number | null,
+      expandedSampleIds: new Set<number>(),
       modalOpen: false,
       modalMode: "create" as "create" | "edit",
       modalTitle: "",
@@ -801,6 +1100,28 @@ export default defineComponent({
       sampleStatuses: [] as SampleStatusRef[],
       containers: [] as ContainerRef[],
       nationalities: [] as NationalityRef[],
+      departments: [] as { departmentId: number; departmentName: string }[],
+      specimenActionModalOpen: false,
+      specimenActionModalType: null as "withdraw" | "return" | "exhaust" | null,
+      specimenActionSpecimen: null as Specimen | null,
+      specimenActionForm: {
+        transactionDate: "",
+        departmentId: null as number | null,
+        purpose: "",
+        notes: "",
+      },
+      specimenJournalModalOpen: false,
+      specimenJournalSpecimen: null as Specimen | null,
+      specimenJournalTransactions: [] as Array<{
+        transactionId: number;
+        transactionDate: string;
+        transactionTypeName: string;
+        userFullName: string;
+        departmentName: string | null;
+        purpose: string | null;
+        notes: string | null;
+      }>,
+      specimenJournalLoading: false,
       filterRows: [
         { fieldKey: "", value: null as string | number | null },
       ] as Array<{ fieldKey: string; value: string | number | null }>,
@@ -927,6 +1248,12 @@ export default defineComponent({
           labelFull: "Исследование",
           visible: false,
         },
+        {
+          key: "visitId",
+          label: "ID визита",
+          labelFull: "ID визита (для импорта)",
+          visible: false,
+        },
       ] as ColumnConfig[],
       headerHelp: {
         sampleTypeIcon: "",
@@ -957,6 +1284,17 @@ export default defineComponent({
           "Дата и точное время процедуры взятия биоматериала у пациента",
       } as Record<string, string>,
       activeHeaderHelp: null as string | null,
+      tableWrapperRef: null as HTMLElement | null,
+      tableIsDragging: false,
+      tableDragStartX: 0,
+      tableDragStartScroll: 0,
+      tableDragMoveHandler: null as ((e: MouseEvent) => void) | null,
+      tableDragEndHandler: null as (() => void) | null,
+      importModalOpen: false,
+      importPreviewRows: [] as string[][],
+      importPreviewHeaders: [] as string[],
+      importError: null as string | null,
+      importInProgress: false,
     };
   },
   computed: {
@@ -974,12 +1312,21 @@ export default defineComponent({
       return this.calculateActualMonths(this.modalSample.collectionDate);
     },
     expiryPreview(): string {
+      const recommended = this.modalSample.recommendedStorageMonths;
+      if (recommended == null || Number.isNaN(recommended)) {
+        return "Годен";
+      }
       return getExpiryStatusLabel(
-        getExpiryStatusCode(
-          this.modalSample.collectionDate,
-          this.modalSample.recommendedStorageMonths
-        )
+        getExpiryStatusCode(this.modalSample.collectionDate, recommended)
       );
+    },
+    specimenActionModalTitle(): string {
+      if (this.specimenActionModalType === "withdraw")
+        return "Изъятие из хранилища";
+      if (this.specimenActionModalType === "return")
+        return "Возврат в хранилище";
+      if (this.specimenActionModalType === "exhaust") return "Проба исчерпана";
+      return "";
     },
     filteredSamples(): Sample[] {
       const activeFilters = this.filterRows.filter(
@@ -988,10 +1335,23 @@ export default defineComponent({
       if (activeFilters.length === 0) {
         return this.samples;
       }
+      const byField = new Map<string, Array<string | number | null>>();
+      for (const f of activeFilters) {
+        let arr = byField.get(f.fieldKey);
+        if (!arr) {
+          arr = [];
+          byField.set(f.fieldKey, arr);
+        }
+        arr.push(f.value);
+      }
       return this.samples.filter((sample) => {
-        return activeFilters.every((f) =>
-          this.sampleMatchesFilter(sample, f.fieldKey, f.value)
-        );
+        for (const [fieldKey, values] of byField) {
+          const matchesAny = values.some((v) =>
+            this.sampleMatchesFilter(sample, fieldKey, v)
+          );
+          if (!matchesAny) return false;
+        }
+        return true;
       });
     },
   },
@@ -1016,7 +1376,48 @@ export default defineComponent({
       this.syncSpecimens();
     },
   },
+  beforeUnmount() {
+    const moveHandler = this.tableDragMoveHandler;
+    const endHandler = this.tableDragEndHandler;
+    if (moveHandler && endHandler) {
+      document.removeEventListener("mousemove", moveHandler);
+      document.removeEventListener("mouseup", endHandler);
+    }
+  },
   methods: {
+    onTableWrapperMouseDown(e: MouseEvent) {
+      if (e.button !== 0) return;
+      const target = e.target as HTMLElement;
+      if (target.closest("button, a, input, select")) return;
+      const el = this.$refs.tableWrapperRef as HTMLElement | null;
+      if (!el || el.scrollWidth <= el.clientWidth) return;
+      this.tableDragStartX = e.clientX;
+      this.tableDragStartScroll = el.scrollLeft;
+      this.tableIsDragging = true;
+      e.preventDefault();
+      this.tableDragMoveHandler = (ev: MouseEvent) => this.onTableDragMove(ev);
+      this.tableDragEndHandler = () => this.onTableDragEnd();
+      document.addEventListener("mousemove", this.tableDragMoveHandler);
+      document.addEventListener("mouseup", this.tableDragEndHandler);
+    },
+    onTableDragMove(e: MouseEvent) {
+      if (!this.tableIsDragging) return;
+      const el = this.$refs.tableWrapperRef as HTMLElement | null;
+      if (!el) return;
+      el.scrollLeft =
+        this.tableDragStartScroll + (this.tableDragStartX - e.clientX);
+    },
+    onTableDragEnd() {
+      this.tableIsDragging = false;
+      const moveHandler = this.tableDragMoveHandler;
+      const endHandler = this.tableDragEndHandler;
+      if (moveHandler && endHandler) {
+        document.removeEventListener("mousemove", moveHandler);
+        document.removeEventListener("mouseup", endHandler);
+        this.tableDragMoveHandler = null;
+        this.tableDragEndHandler = null;
+      }
+    },
     toggleHeaderHelp(key: string) {
       this.activeHeaderHelp = this.activeHeaderHelp === key ? null : key;
     },
@@ -1046,6 +1447,7 @@ export default defineComponent({
           researchesResponse,
           diagnosesResponse,
           nationalitiesResponse,
+          departmentsResponse,
         ] = await Promise.all([
           axios.get("/references/sample-types"),
           axios.get("/references/sample-statuses"),
@@ -1055,6 +1457,7 @@ export default defineComponent({
           axios.get("/researches"),
           axios.get("/references/diagnoses"),
           axios.get("/references/nationalities"),
+          axios.get("/references/departments"),
         ]);
         this.sampleTypes = this.sortByNameWithUnknown(
           typesResponse.data,
@@ -1089,6 +1492,7 @@ export default defineComponent({
           (a: NationalityRef, b: NationalityRef) =>
             a.nationalityName.localeCompare(b.nationalityName, "ru-RU")
         );
+        this.departments = departmentsResponse.data || [];
       } catch (error) {
         console.error("Ошибка при загрузке справочников:", error);
       }
@@ -1242,8 +1646,13 @@ export default defineComponent({
       });
     },
     selectSample(sampleId: number) {
-      this.selectedSampleId =
-        this.selectedSampleId === sampleId ? null : sampleId;
+      const next = new Set(this.expandedSampleIds);
+      if (next.has(sampleId)) {
+        next.delete(sampleId);
+      } else {
+        next.add(sampleId);
+      }
+      this.expandedSampleIds = next;
     },
     editSampleRow(sampleId: number) {
       this.selectedSampleId = sampleId;
@@ -1317,9 +1726,30 @@ export default defineComponent({
     closeModal() {
       this.modalOpen = false;
     },
+    resetSampleForm() {
+      this.modalSample = {
+        visitId: null,
+        barcode: "",
+        sampleTypeId: null,
+        initialQuantity: null,
+        currentQuantity: null,
+        recommendedStorageMonths: null,
+        actualStorageMonths: null,
+        expiryStatus: "",
+        containerId: null,
+        collectionDate: "",
+        specimens: [],
+      };
+      this.syncSpecimens();
+      this.errorMessage = "";
+    },
     async submitModal() {
       this.errorMessage = "";
       this.successMessage = "";
+      if (!this.modalSample.collectionDate?.trim()) {
+        this.errorMessage = "Укажите дату забора образца.";
+        return;
+      }
       const quantity = Number(this.modalSample.initialQuantity || 0);
       const specimens = this.modalSample.specimens || [];
       if (quantity > 0 && specimens.length !== quantity) {
@@ -1410,17 +1840,20 @@ export default defineComponent({
         containerId: sampleContainerId,
         positionInContainer: a.positionInContainer || null,
       }));
+      const initialQty = this.toNullableNumber(
+        this.modalSample.initialQuantity
+      );
+      const currentQty =
+        this.modalSample.currentQuantity != null
+          ? this.modalSample.currentQuantity
+          : initialQty;
       return {
         visitId: this.toNullableNumber(this.modalSample.visitId),
         barcode: this.modalSample.barcode,
         sampleTypeId: this.toNullableNumber(this.modalSample.sampleTypeId),
-        initialQuantity: this.toNullableNumber(
-          this.modalSample.initialQuantity
-        ),
-        currentQuantity: this.toNullableNumber(
-          this.modalSample.currentQuantity
-        ),
-        recommendedStorageMonths: this.toNullableNumber(
+        initialQuantity: initialQty,
+        currentQuantity: currentQty,
+        recommendedStorageMonths: this.toNullableRecommendedMonths(
           this.modalSample.recommendedStorageMonths
         ),
         containerId: this.toNullableNumber(this.modalSample.containerId),
@@ -1430,6 +1863,13 @@ export default defineComponent({
     },
     toNullableNumber(value: number | null) {
       return value === null ? null : value;
+    },
+    toNullableRecommendedMonths(
+      value: string | number | null | undefined
+    ): number | null {
+      if (value === null || value === undefined) return null;
+      const n = Number(value);
+      return Number.isFinite(n) ? n : null;
     },
     resolveErrorMessage(error: unknown, fallbackMessage: string) {
       if (axios.isAxiosError(error)) {
@@ -1459,15 +1899,8 @@ export default defineComponent({
         });
       }
     },
-    availableFilterFieldsForRow(rowIndex: number) {
-      const usedKeys = new Set(
-        this.filterRows
-          .map((r, i) => (i !== rowIndex && r.fieldKey ? r.fieldKey : null))
-          .filter(Boolean)
-      );
-      return this.filterFieldDefinitions.filter(
-        (def) => !usedKeys.has(def.key)
-      );
+    availableFilterFieldsForRow() {
+      return this.filterFieldDefinitions;
     },
     isFilterValueActive(fieldKey: string, value: string | number | null) {
       if (value === null || value === undefined) {
@@ -1587,6 +2020,213 @@ export default defineComponent({
         { fieldKey: "", value: null as string | number | null },
       ];
     },
+    exportToExcel() {
+      const cols = this.visibleColumns.filter(
+        (c) => c.key !== "sampleTypeIcon"
+      );
+      if (cols.length === 0) {
+        this.errorMessage = "Выберите хотя бы один столбец для экспорта";
+        return;
+      }
+      const headers = cols.map((c) => c.label);
+      const rows = this.filteredSamples.map((sample) =>
+        cols.map((col) => {
+          const v = this.formatValue(sample, col.key);
+          return v === "—" ? "" : String(v);
+        })
+      );
+      const wsData = [headers, ...rows];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Образцы");
+      const fileName = `образцы_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      this.successMessage = `Экспортировано ${rows.length} записей`;
+    },
+    openImportModal() {
+      this.importModalOpen = true;
+      this.importPreviewRows = [];
+      this.importPreviewHeaders = [];
+      this.importError = null;
+      this.$nextTick(() => {
+        const input = this.$refs.importFileInputRef as
+          | HTMLInputElement
+          | undefined;
+        if (input) input.value = "";
+      });
+    },
+    closeImportModal() {
+      this.importModalOpen = false;
+      this.importPreviewRows = [];
+      this.importPreviewHeaders = [];
+      this.importError = null;
+    },
+    onImportFileChange(event: Event) {
+      const input = event.target as HTMLInputElement;
+      const file = input?.files?.[0];
+      this.importError = null;
+      this.importPreviewRows = [];
+      this.importPreviewHeaders = [];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = e.target?.result;
+          if (!data) return;
+          const wb = XLSX.read(data, { type: "binary" });
+          const firstSheet = wb.Sheets[wb.SheetNames[0]];
+          const json = XLSX.utils.sheet_to_json<string[]>(firstSheet, {
+            header: 1,
+            defval: "",
+          });
+
+          if (json.length < 2) {
+            this.importError = "Файл пуст или содержит только заголовки";
+            return;
+          }
+          const headers = (json[0] as string[]).map((h) =>
+            String(h ?? "").trim()
+          );
+          const rows = (json.slice(1) as string[][])
+            .filter((row) => row.some((c) => c != null && String(c).trim()))
+            .map((row) => headers.map((_, i) => String(row[i] ?? "").trim()));
+          this.importPreviewHeaders = headers;
+          this.importPreviewRows = rows;
+        } catch (err) {
+          console.error(err);
+          this.importError = "Ошибка чтения файла Excel";
+        }
+      };
+      reader.readAsBinaryString(file);
+    },
+    async doImport() {
+      if (this.importPreviewRows.length === 0) return;
+      this.importInProgress = true;
+      this.importError = null;
+      const allCols = this.columns.filter((c) => c.key !== "sampleTypeIcon");
+      const colToKey = new Map(allCols.map((c) => [c.label, c.key]));
+
+      const fileHeaders = this.importPreviewHeaders;
+      const colIndex = new Map<string, number>();
+      for (let i = 0; i < fileHeaders.length; i++) {
+        const h = fileHeaders[i];
+        const key = colToKey.get(h) ?? this.matchImportHeader(h);
+        if (key) colIndex.set(key, i);
+      }
+
+      const needVisitId = colIndex.has("visitId");
+      const needBarcode = colIndex.has("barcode");
+      if (!needBarcode) {
+        this.importError = "В файле должен быть столбец «Штрихкод»";
+        this.importInProgress = false;
+        return;
+      }
+      if (!needVisitId) {
+        this.importError =
+          "В файле должен быть столбец «ID визита». Выберите «ID визита» в столбцах и экспортируйте данные, затем импортируйте.";
+        this.importInProgress = false;
+        return;
+      }
+
+      let created = 0;
+      let failed = 0;
+      for (const row of this.importPreviewRows) {
+        const getRowVal = (key: string) => {
+          const idx = colIndex.get(key);
+          return idx !== undefined ? row[idx] : undefined;
+        };
+        const barcode = getRowVal("barcode")?.trim();
+        const visitId = getRowVal("visitId");
+        if (!barcode || !visitId) continue;
+
+        const visitIdNum = Number(visitId);
+        if (!Number.isFinite(visitIdNum)) continue;
+
+        const sampleTypeId = this.resolveImportSampleType(
+          getRowVal("sampleTypeId")
+        );
+        const containerId = this.resolveImportContainer(
+          getRowVal("containerId")
+        );
+        const initialQty =
+          this.toNullableNumber(Number(getRowVal("initialQuantity") ?? 1)) ?? 1;
+        const currentQty =
+          this.toNullableNumber(
+            Number(getRowVal("currentQuantity") ?? initialQty)
+          ) ?? initialQty;
+        const recommended = this.toNullableRecommendedMonths(
+          getRowVal("recommendedStorageMonths") ?? undefined
+        );
+        const collectionDate = getRowVal("createdAtSample");
+        const collectionDateFormatted = collectionDate
+          ? this.toDatetimeLocal(collectionDate.replace(" ", "T").slice(0, 16))
+          : null;
+
+        try {
+          await axios.post("/samples", {
+            visitId: visitIdNum,
+            barcode,
+            sampleTypeId,
+            initialQuantity: initialQty,
+            currentQuantity: currentQty,
+            recommendedStorageMonths: recommended,
+            containerId,
+            collectionDate: collectionDateFormatted,
+            specimens: [],
+          });
+          created++;
+        } catch (err) {
+          console.error(err);
+          failed++;
+        }
+      }
+      this.importInProgress = false;
+      if (created > 0) {
+        this.successMessage = `Импортировано ${created} образцов`;
+        await this.fetchSamples();
+        this.closeImportModal();
+      }
+      if (failed > 0) {
+        this.importError = `Не удалось импортировать ${failed} записей`;
+      }
+    },
+    matchImportHeader(h: string): string | null {
+      const m: Record<string, string> = {
+        Штрихкод: "barcode",
+        "ID визита": "visitId",
+        Тип: "sampleTypeId",
+        "Тип образца": "sampleTypeId",
+        Контейнер: "containerId",
+        "Нач. кол-во": "initialQuantity",
+        "Начальное количество": "initialQuantity",
+        "Тек. кол-во": "currentQuantity",
+        "Текущее количество": "currentQuantity",
+        "Дата забора": "createdAtSample",
+        "Рек. хранение": "recommendedStorageMonths",
+        "Рекомендованный срок хранения": "recommendedStorageMonths",
+      };
+      return m[h] ?? null;
+    },
+    resolveImportSampleType(val: string | undefined): number | null {
+      if (!val || val === "—") return null;
+      const n = Number(val);
+      if (Number.isFinite(n)) return n;
+      const type = this.sampleTypes.find(
+        (t) => t.sampleTypeName?.toLowerCase() === String(val).toLowerCase()
+      );
+      return type?.sampleTypeId ?? null;
+    },
+    resolveImportContainer(val: string | undefined): number | null {
+      if (!val || val === "—") return null;
+      const n = Number(val);
+      if (Number.isFinite(n)) return n;
+      const label = String(val).toLowerCase();
+      const c = this.containers.find((cont) => {
+        const l = this.getContainerLabel(cont.containerId).toLowerCase();
+        return l.includes(label) || label.includes(l);
+      });
+      return c?.containerId ?? null;
+    },
     getVisitLabel(visitId: number | null | undefined) {
       if (!visitId) return "—";
       const visit = this.visits.find((item) => item.visitId === visitId);
@@ -1694,6 +2334,96 @@ export default defineComponent({
       );
       return target?.sampleStatusId ?? null;
     },
+    getWithdrawnStatusId() {
+      const target = this.sampleStatuses.find(
+        (s) => s.sampleStatusName?.trim().toLowerCase() === "изъят"
+      );
+      return target?.sampleStatusId ?? null;
+    },
+    getExhaustedStatusId() {
+      const target = this.sampleStatuses.find(
+        (s) => s.sampleStatusName?.trim().toLowerCase() === "исчерпан"
+      );
+      return target?.sampleStatusId ?? null;
+    },
+    isSpecimenWithdrawn(sampleStatusId: number | null | undefined): boolean {
+      return sampleStatusId === this.getWithdrawnStatusId();
+    },
+    isSpecimenExhausted(sampleStatusId: number | null | undefined): boolean {
+      return sampleStatusId === this.getExhaustedStatusId();
+    },
+    getDefaultTransactionDateTime(): string {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, "0");
+      const d = String(now.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}T08:00`;
+    },
+    openSpecimenActionModal(
+      specimen: Specimen,
+      type: "withdraw" | "return" | "exhaust"
+    ) {
+      this.specimenActionSpecimen = specimen;
+      this.specimenActionModalType = type;
+      this.specimenActionForm = {
+        transactionDate: this.getDefaultTransactionDateTime(),
+        departmentId: null,
+        purpose: "",
+        notes: "",
+      };
+      this.specimenActionModalOpen = true;
+    },
+    closeSpecimenActionModal() {
+      this.specimenActionModalOpen = false;
+      this.specimenActionSpecimen = null;
+      this.specimenActionModalType = null;
+    },
+    async submitSpecimenAction() {
+      if (!this.specimenActionSpecimen || !this.specimenActionModalType) return;
+      const url =
+        this.specimenActionModalType === "withdraw"
+          ? `/specimens/${this.specimenActionSpecimen.specimenId}/withdraw`
+          : this.specimenActionModalType === "return"
+          ? `/specimens/${this.specimenActionSpecimen.specimenId}/return`
+          : `/specimens/${this.specimenActionSpecimen.specimenId}/exhaust`;
+      try {
+        await axios.post(url, {
+          transactionDate: this.specimenActionForm.transactionDate,
+          departmentId: this.specimenActionForm.departmentId,
+          purpose: this.specimenActionForm.purpose || null,
+          notes: this.specimenActionForm.notes || null,
+        });
+        this.closeSpecimenActionModal();
+        await this.fetchSamples();
+      } catch (e) {
+        this.errorMessage = "Ошибка при выполнении операции";
+      }
+    },
+    async openSpecimenJournalModal(specimen: Specimen) {
+      this.specimenJournalSpecimen = specimen;
+      this.specimenJournalModalOpen = true;
+      this.specimenJournalLoading = true;
+      this.specimenJournalTransactions = [];
+      try {
+        const { data } = await axios.get(
+          `/specimens/${specimen.specimenId}/transactions`
+        );
+        this.specimenJournalTransactions = data;
+      } catch {
+        this.specimenJournalTransactions = [];
+      } finally {
+        this.specimenJournalLoading = false;
+      }
+    },
+    closeSpecimenJournalModal() {
+      this.specimenJournalModalOpen = false;
+      this.specimenJournalSpecimen = null;
+      this.specimenJournalTransactions = [];
+    },
+    formatSpecimenTxDate(dt: string): string {
+      if (!dt) return "—";
+      return new Date(dt).toLocaleString("ru-RU");
+    },
     numberingTypeLabel(type: string | null | undefined): string {
       if (!type) return "";
       const map: Record<string, string> = {
@@ -1726,7 +2456,7 @@ export default defineComponent({
           : numbering
           ? ` (${numbering})`
           : "";
-      return `${name}${extra} №${number}`;
+      return `${name}${extra} ${number}`;
     },
     getContainerLabel(containerId: number | null | undefined) {
       if (!containerId) return "—";
@@ -1746,7 +2476,16 @@ export default defineComponent({
     },
     formatValue(sample: Sample, key: string) {
       if (key === "expiryStatus") {
+        if (sample.recommendedStorageMonths == null) {
+          return "Годен";
+        }
         return getExpiryStatusLabel(this.getSampleExpiryStatus(sample));
+      }
+      if (key === "recommendedStorageMonths") {
+        if (sample.recommendedStorageMonths == null) {
+          return "Бессрочно";
+        }
+        return String(sample.recommendedStorageMonths);
       }
       if (key === "researchInfo") {
         const visit = this.getVisitById(sample.visitId);
@@ -1795,6 +2534,9 @@ export default defineComponent({
       }
       if (key === "containerId") {
         return this.getContainerLabel(sample.containerId);
+      }
+      if (key === "visitId") {
+        return sample.visitId ?? "—";
       }
       return value;
     },
@@ -1849,17 +2591,17 @@ h2 {
 }
 
 .filters-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 8px;
   margin-bottom: 16px;
 }
 
 .filter-row {
   display: flex;
   align-items: flex-end;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 8px;
+  flex-wrap: nowrap;
 }
 
 .filter-field-group {
@@ -1868,8 +2610,8 @@ h2 {
 }
 
 .filter-value-group {
-  flex: 0 0 220px;
-  max-width: 220px;
+  flex: 0 0 180px;
+  min-width: 140px;
 }
 
 .filter-value-group .filter-placeholder {
@@ -1954,6 +2696,52 @@ h2 {
   min-width: 90px;
 }
 
+.specimen-actions-col {
+  min-width: 140px;
+}
+
+.specimen-actions-cell {
+  white-space: nowrap;
+}
+
+.specimen-action-buttons {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.specimen-action-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.specimen-action-btn .action-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.journal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.journal-table th,
+.journal-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.journal-table thead th {
+  background: #f3ede4;
+  font-weight: 600;
+}
+
 .specimen-barcode-cell {
   display: flex;
   flex-direction: column;
@@ -1988,7 +2776,7 @@ h2 {
 
 .specimen-form-row {
   display: grid;
-  grid-template-columns: 100px 1fr 140px 120px;
+  grid-template-columns: 100px 1fr 120px;
   gap: 8px;
   align-items: center;
 }
@@ -2020,6 +2808,10 @@ h2 {
   border: 1px solid var(--border);
   background-color: #e2d6c8;
   color: var(--text-secondary);
+}
+
+.form-modal .form-actions {
+  margin-top: 16px;
 }
 
 .form-actions {
@@ -2073,6 +2865,18 @@ h2 {
 .table-wrapper {
   width: 100%;
   overflow: auto;
+  cursor: grab;
+}
+.table-wrapper button,
+.table-wrapper a {
+  cursor: pointer;
+}
+.table-wrapper:active {
+  cursor: grabbing;
+}
+.table-wrapper--grabbing {
+  cursor: grabbing;
+  user-select: none;
 }
 
 .table-card.empty-table .table-wrapper {
@@ -2256,8 +3060,8 @@ h2 {
 }
 
 .form-modal {
-  min-height: 600px;
-  max-height: calc(100vh - 120px);
+  min-height: 50vh;
+  max-height: 85vh;
   overflow: auto;
 }
 
@@ -2280,5 +3084,47 @@ h2 {
   background-color: #cfc1ad;
   color: var(--text-primary);
   border: 1px solid #cfc1ad;
+}
+
+.import-modal {
+  max-width: 90vw;
+}
+
+.import-hint {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 12px 0;
+}
+
+.import-preview-wrapper {
+  max-height: 300px;
+  overflow: auto;
+  margin: 16px 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.import-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.import-preview-table th,
+.import-preview-table td {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+.import-preview-table th {
+  background: #ddd1c4;
+  font-weight: 600;
+}
+
+.import-more-rows {
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
 }
 </style>

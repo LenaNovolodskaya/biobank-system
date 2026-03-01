@@ -1,6 +1,8 @@
 package ru.healthfamily.biobank.service;
 
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.healthfamily.biobank.dto.*;
@@ -10,6 +12,7 @@ import ru.healthfamily.biobank.model.User;
 import ru.healthfamily.biobank.model.UserPermissionOverride;
 import ru.healthfamily.biobank.repository.PermissionRepository;
 import ru.healthfamily.biobank.repository.RoleRepository;
+import ru.healthfamily.biobank.repository.UserPermissionOverrideRepository;
 import ru.healthfamily.biobank.repository.UserRepository;
 
 import java.util.*;
@@ -22,6 +25,9 @@ public class UserService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
+    private final UserPermissionOverrideRepository userPermissionOverrideRepository;
+    private final EntityManager entityManager;
+    private final PasswordEncoder passwordEncoder;
 
     public List<UserDTO> getAllUsers() {
         return userRepository.findAll().stream()
@@ -33,6 +39,31 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден: " + userId));
         return toUserDTO(user);
+    }
+
+    @Transactional
+    public UserDTO createUser(CreateUserRequest request) {
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new IllegalArgumentException("Пользователь с таким логином уже существует");
+        }
+        User user = new User();
+        user.setUsername(request.getUsername());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setFullName(request.getFullName());
+        user.setIsActive(true);
+        for (Long roleId : request.getRoleIds()) {
+            Role role = roleRepository.findById(roleId)
+                    .orElseThrow(() -> new IllegalArgumentException("Роль не найдена: " + roleId));
+            user.getRoles().add(role);
+        }
+        return toUserDTO(userRepository.save(user));
+    }
+
+    @Transactional
+    public void deleteUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден: " + userId));
+        userRepository.delete(user);
     }
 
     @Transactional
@@ -66,6 +97,11 @@ public class UserService {
         return toUserDTO(userRepository.save(user));
     }
 
+    private static final Set<String> DEFAULT_VIEW_ONLY = Set.of(
+            "patient.view", "visit.view", "sample.view", "research.view",
+            "storage.view", "reference.view"
+    );
+
     public List<UserPermissionMatrixItemDTO> getUserPermissionsMatrix(Long userId, Set<Long> roleIds) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден: " + userId));
@@ -82,10 +118,12 @@ public class UserService {
             rolesForMatrix = user.getRoles();
         }
 
-        Set<String> inherited = rolesForMatrix.stream()
-                .flatMap(r -> r.getPermissions().stream())
-                .map(Permission::getPermissionName)
-                .collect(Collectors.toSet());
+        Set<String> inherited = rolesForMatrix.isEmpty()
+                ? new HashSet<>(DEFAULT_VIEW_ONLY)
+                : rolesForMatrix.stream()
+                        .flatMap(r -> r.getPermissions().stream())
+                        .map(Permission::getPermissionName)
+                        .collect(Collectors.toSet());
 
         Map<String, Boolean> overrides = user.getPermissionOverrides().stream()
                 .collect(Collectors.toMap(
@@ -114,18 +152,22 @@ public class UserService {
 
     @Transactional
     public void setUserPermissionOverrides(Long userId, SetUserPermissionOverridesRequest request) {
+        userPermissionOverrideRepository.deleteByUserUserId(userId);
+        entityManager.flush();
+        entityManager.clear();
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден: " + userId));
 
-        // replace overrides полностью (UI присылает только отличия от роли)
-        user.getPermissionOverrides().clear();
-
-        if (request.getOverrides() == null) {
-            userRepository.save(user);
+        if (request.getOverrides() == null || request.getOverrides().isEmpty()) {
             return;
         }
 
+        Set<Long> seenPermissionIds = new HashSet<>();
         for (SetUserPermissionOverridesRequest.Item item : request.getOverrides()) {
+            if (!seenPermissionIds.add(item.getPermissionId())) {
+                continue;
+            }
             Permission permission = permissionRepository.findById(item.getPermissionId())
                     .orElseThrow(() -> new IllegalArgumentException("Разрешение не найдено: " + item.getPermissionId()));
             UserPermissionOverride o = new UserPermissionOverride();

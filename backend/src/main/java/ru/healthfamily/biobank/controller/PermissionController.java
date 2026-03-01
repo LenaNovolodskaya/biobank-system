@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/permissions")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('role.manage')")
+@PreAuthorize("hasAnyAuthority('role.permissions.manage','role.manage')")
 public class PermissionController {
 
     private final PermissionRepository permissionRepository;
