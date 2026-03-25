@@ -20,14 +20,16 @@ public class Sample {
     @Column(name = "sample_id")
     private Long sampleId;
 
-    @Column(name = "visit_id", nullable = false)
-    private Long visitId;
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "visit_id", nullable = false)
+    private Visit visit;
 
     @Column(name = "barcode", nullable = false, unique = true)
     private String barcode;
 
-    @Column(name = "sample_type_id")
-    private Long sampleTypeId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sample_type_id")
+    private SampleType sampleType;
 
     @Column(name = "initial_quantity", nullable = false)
     private Integer initialQuantity;
@@ -45,8 +47,9 @@ public class Sample {
     @Column(name = "expiry_status", length = 20)
     private ExpiryStatus expiryStatus = ExpiryStatus.GREEN;
 
-    @Column(name = "container_id")
-    private Long containerId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "container_id")
+    private StorageContainer container;
 
     @Column(name = "created_at_sample")
     private LocalDateTime createdAtSample;

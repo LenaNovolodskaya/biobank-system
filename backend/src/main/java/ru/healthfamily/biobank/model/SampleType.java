@@ -1,14 +1,13 @@
 package ru.healthfamily.biobank.model;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "sample_types")
@@ -27,4 +26,8 @@ public class SampleType {
 
     @Column(name = "icon_path")
     private String iconPath;
+
+    @OneToMany(mappedBy = "sampleType", fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<Sample> samples = new ArrayList<>();
 }

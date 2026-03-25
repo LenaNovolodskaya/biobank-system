@@ -31,24 +31,31 @@ public class Patient {
     @Column(name = "birth_date", nullable = false)
     private LocalDate birthDate;
     
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "nationality_id")
     private Nationality nationality;
 
-    @Column(name = "main_diagnosis_id")
-    private Long mainDiagnosisId;
-    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "main_diagnosis_id")
+    private Diagnosis mainDiagnosis;
+
     @Column(name = "created_at_patient")
     private LocalDateTime createdAtPatient;
-    
+
     @Column(name = "informed_consent")
     private Boolean informedConsent;
 
-    @ElementCollection
-    @CollectionTable(name = "patient_comorbid_diagnoses", joinColumns = @JoinColumn(name = "patient_id"))
-    @Column(name = "diagnosis_id")
-    private List<Long> comorbidDiagnosisIds = new ArrayList<>();
-    
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "patient_comorbid_diagnoses",
+            joinColumns = @JoinColumn(name = "patient_id"),
+            inverseJoinColumns = @JoinColumn(name = "diagnosis_id")
+    )
+    private List<Diagnosis> comorbidDiagnoses = new ArrayList<>();
+
+    @OneToMany(mappedBy = "patient", fetch = FetchType.LAZY)
+    private List<Visit> visits = new ArrayList<>();
+
     public enum Gender {
         UNKNOWN, MALE, FEMALE
     }

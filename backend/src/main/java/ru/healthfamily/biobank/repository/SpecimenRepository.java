@@ -12,11 +12,11 @@ public interface SpecimenRepository extends JpaRepository<Specimen, Long> {
 
     List<Specimen> findBySampleSampleIdOrderBySpecimenId(Long sampleId);
 
-    @Query("SELECT DISTINCT s.sample.sampleId FROM Specimen s WHERE s.sampleStatusId = :statusId")
+    @Query("SELECT DISTINCT s.sample.sampleId FROM Specimen s WHERE s.sampleStatus.sampleStatusId = :statusId")
     List<Long> findSampleIdsBySampleStatusId(Long statusId);
 
     @Query("SELECT s FROM Specimen s LEFT JOIN FETCH s.sample")
     List<Specimen> findAllWithSample();
 
-    long countByContainerId(Long containerId);
+    long countByContainer_ContainerId(Long containerId);
 }

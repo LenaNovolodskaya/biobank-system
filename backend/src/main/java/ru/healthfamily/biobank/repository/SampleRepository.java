@@ -7,7 +7,7 @@ import java.util.Collection;
 
 @Repository
 public interface SampleRepository extends JpaRepository<Sample, Long> {
-    void deleteByVisitId(Long visitId);
+    void deleteByVisit_VisitId(Long visitId);
 
-    void deleteByVisitIdIn(Collection<Long> visitIds);
+    void deleteByVisit_VisitIdIn(Collection<Long> visitIds);
 }

@@ -8,27 +8,27 @@ import java.util.List;
 
 @Repository
 public interface VisitRepository extends JpaRepository<Visit, Long> {
-    boolean existsByPatientIdAndVisitNumber(Long patientId, Integer visitNumber);
+    boolean existsByPatient_PatientIdAndVisitNumber(Long patientId, Integer visitNumber);
 
-    boolean existsByPatientIdAndVisitNumberAndVisitIdNot(
+    boolean existsByPatient_PatientIdAndVisitNumberAndVisitIdNot(
             Long patientId,
             Integer visitNumber,
             Long visitId
     );
 
-    boolean existsByPatientIdAndCollectionDate(Long patientId, LocalDateTime collectionDate);
+    boolean existsByPatient_PatientIdAndCollectionDate(Long patientId, LocalDateTime collectionDate);
 
-    boolean existsByPatientIdAndCollectionDateAndVisitIdNot(
+    boolean existsByPatient_PatientIdAndCollectionDateAndVisitIdNot(
             Long patientId,
             LocalDateTime collectionDate,
             Long visitId
     );
 
-    List<Visit> findByPatientId(Long patientId);
+    List<Visit> findByPatient_PatientId(Long patientId);
 
-    List<Visit> findByResearchId(Long researchId);
+    List<Visit> findByResearch_ResearchId(Long researchId);
 
-    void deleteByPatientId(Long patientId);
+    void deleteByPatient_PatientId(Long patientId);
 
-    void deleteByResearchId(Long researchId);
+    void deleteByResearch_ResearchId(Long researchId);
 }

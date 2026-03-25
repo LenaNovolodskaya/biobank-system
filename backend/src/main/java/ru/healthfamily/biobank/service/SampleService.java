@@ -9,11 +9,15 @@ import ru.healthfamily.biobank.dto.CreateSampleRequest;
 import ru.healthfamily.biobank.dto.SampleDTO;
 import ru.healthfamily.biobank.model.Specimen;
 import ru.healthfamily.biobank.model.Sample;
+import ru.healthfamily.biobank.model.Visit;
 import ru.healthfamily.biobank.model.SampleStatus;
 import ru.healthfamily.biobank.model.Sample.ExpiryStatus;
+import ru.healthfamily.biobank.model.SampleType;
+import ru.healthfamily.biobank.model.StorageContainer;
 import ru.healthfamily.biobank.repository.SpecimenRepository;
 import ru.healthfamily.biobank.repository.SampleRepository;
 import ru.healthfamily.biobank.repository.SampleStatusRepository;
+import ru.healthfamily.biobank.repository.SampleTypeRepository;
 import ru.healthfamily.biobank.repository.StorageContainerRepository;
 import ru.healthfamily.biobank.repository.VisitRepository;
 
@@ -37,6 +41,7 @@ public class SampleService {
     private final SampleStatusRepository sampleStatusRepository;
     private final StorageContainerRepository containerRepository;
     private final VisitRepository visitRepository;
+    private final SampleTypeRepository sampleTypeRepository;
     private final EntityManager entityManager;
     private final SampleTransactionService sampleTransactionService;
 
@@ -71,10 +76,10 @@ public class SampleService {
                 ? new java.util.HashSet<>(specimenRepository.findSampleIdsBySampleStatusId(sampleStatusId)) : null;
         return samples.stream()
                 .filter(sample -> matchesSearch(sample, search, specimensBySampleId.getOrDefault(sample.getSampleId(), List.of())))
-                .filter(sample -> containerId == null || containerId.equals(sample.getContainerId()))
-                .filter(sample -> sampleTypeId == null || sampleTypeId.equals(sample.getSampleTypeId()))
+                .filter(sample -> containerId == null || (sample.getContainer() != null && containerId.equals(sample.getContainer().getContainerId())))
+                .filter(sample -> sampleTypeId == null || (sample.getSampleType() != null && sampleTypeId.equals(sample.getSampleType().getSampleTypeId())))
                 .filter(sample -> sampleStatusId == null || (sampleIdsWithStatus != null && sampleIdsWithStatus.contains(sample.getSampleId())))
-                .filter(sample -> visitId == null || visitId.equals(sample.getVisitId()))
+                .filter(sample -> visitId == null || (sample.getVisit() != null && visitId.equals(sample.getVisit().getVisitId())))
                 .filter(sample -> expiryStatus == null || expiryStatus == sample.getExpiryStatus())
                 .map(sample -> toDTO(sample, specimensBySampleId.getOrDefault(sample.getSampleId(), List.of())))
                 .collect(Collectors.toList());
@@ -105,13 +110,13 @@ public class SampleService {
         Sample sample = sampleRepository.findById(sampleId)
                 .orElseThrow(() -> new RuntimeException("Образец не найден"));
         java.util.Set<Long> oldContainerIds = sample.getSpecimens().stream()
-                .map(Specimen::getContainerId)
+                .map(s -> s.getContainer() != null ? s.getContainer().getContainerId() : null)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         applyRequest(sample, request);
         Sample saved = sampleRepository.save(sample);
         java.util.Set<Long> newContainerIds = saved.getSpecimens().stream()
-                .map(Specimen::getContainerId)
+                .map(s -> s.getContainer() != null ? s.getContainer().getContainerId() : null)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         java.util.Set<Long> affected = new java.util.HashSet<>(oldContainerIds);
@@ -130,7 +135,7 @@ public class SampleService {
             // ignore - journal is optional
         }
         java.util.Set<Long> containerIds = sample.getSpecimens().stream()
-                .map(Specimen::getContainerId)
+                .map(s -> s.getContainer() != null ? s.getContainer().getContainerId() : null)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         sampleRepository.delete(sample);
@@ -139,7 +144,7 @@ public class SampleService {
 
     private void updateContainerCountsFromSpecimens(List<Specimen> specimens) {
         specimens.stream()
-                .map(Specimen::getContainerId)
+                .map(s -> s.getContainer() != null ? s.getContainer().getContainerId() : null)
                 .filter(Objects::nonNull)
                 .distinct()
                 .forEach(this::recalculateContainerCount);
@@ -147,7 +152,7 @@ public class SampleService {
 
     private void recalculateContainerCount(Long containerId) {
         containerRepository.findById(containerId).ifPresent(container -> {
-            long count = specimenRepository.countByContainerId(containerId);
+            long count = specimenRepository.countByContainer_ContainerId(containerId);
             container.setCurrentSamplesCount((int) count);
             containerRepository.save(container);
         });
@@ -170,38 +175,47 @@ public class SampleService {
     }
 
     private void applyRequest(Sample sample, CreateSampleRequest request) {
-        sample.setVisitId(request.getVisitId());
+        sample.setVisit(visitRepository.findById(request.getVisitId())
+                .orElseThrow(() -> new IllegalArgumentException("Визит не найден")));
         sample.setBarcode(request.getBarcode());
-        sample.setSampleTypeId(request.getSampleTypeId());
+        sample.setSampleType(request.getSampleTypeId() != null
+                ? sampleTypeRepository.findById(request.getSampleTypeId()).orElse(null)
+                : null);
         sample.setInitialQuantity(request.getInitialQuantity());
         sample.setRecommendedStorageMonths(request.getRecommendedStorageMonths());
         if (request.getCollectionDate() != null) {
             sample.setCreatedAtSample(request.getCollectionDate());
         } else if (sample.getCreatedAtSample() == null) {
             visitRepository.findById(request.getVisitId())
-                    .map(visit -> visit.getCollectionDate())
+                    .map(Visit::getCollectionDate)
                     .ifPresentOrElse(sample::setCreatedAtSample,
                             () -> sample.setCreatedAtSample(LocalDate.now().atTime(8, 0)));
         }
-        sample.setContainerId(request.getContainerId());
+        sample.setContainer(request.getContainerId() != null
+                ? containerRepository.findById(request.getContainerId()).orElse(null)
+                : null);
         applyStorageStatus(sample);
 
         sample.getSpecimens().clear();
         entityManager.flush();
         Long inStorageId = getInStorageStatusId();
+        SampleStatus inStorageStatus = inStorageId != null ? sampleStatusRepository.findById(inStorageId).orElse(null) : null;
         if (request.getSpecimens() != null && !request.getSpecimens().isEmpty()) {
             for (CreateSampleRequest.SpecimenItem item : request.getSpecimens()) {
                 Specimen specimen = new Specimen();
                 specimen.setSample(sample);
                 specimen.setBarcode(item.getBarcode());
-                specimen.setSampleStatusId(item.getSampleStatusId() != null ? item.getSampleStatusId() : inStorageId);
-                specimen.setContainerId(item.getContainerId() != null ? item.getContainerId() : request.getContainerId());
+                specimen.setSampleStatus(item.getSampleStatusId() != null
+                        ? sampleStatusRepository.findById(item.getSampleStatusId()).orElse(inStorageStatus)
+                        : inStorageStatus);
+                Long containerIdToUse = item.getContainerId() != null ? item.getContainerId() : request.getContainerId();
+                specimen.setContainer(containerIdToUse != null ? containerRepository.findById(containerIdToUse).orElse(null) : null);
                 specimen.setPositionInContainer(item.getPositionInContainer());
                 sample.getSpecimens().add(specimen);
             }
         }
         int currentQty = (int) sample.getSpecimens().stream()
-                .filter(s -> inStorageId != null && inStorageId.equals(s.getSampleStatusId()))
+                .filter(s -> inStorageId != null && s.getSampleStatus() != null && inStorageId.equals(s.getSampleStatus().getSampleStatusId()))
                 .count();
         sample.setCurrentQuantity(currentQty);
     }
@@ -245,26 +259,26 @@ public class SampleService {
                         s.getSpecimenId(),
                         s.getBarcode(),
                         s.getSample() != null ? s.getSample().getSampleId() : null,
-                        s.getSampleStatusId(),
-                        s.getContainerId(),
+                        s.getSampleStatus() != null ? s.getSampleStatus().getSampleStatusId() : null,
+                        s.getContainer() != null ? s.getContainer().getContainerId() : null,
                         s.getPositionInContainer()
                 ))
                 .collect(Collectors.toList());
         Long inStorageStatusId = getInStorageStatusId();
         int currentQuantity = (int) specimens.stream()
-                .filter(s -> inStorageStatusId != null && inStorageStatusId.equals(s.getSampleStatusId()))
+                .filter(s -> inStorageStatusId != null && s.getSampleStatus() != null && inStorageStatusId.equals(s.getSampleStatus().getSampleStatusId()))
                 .count();
         return new SampleDTO(
                 sample.getSampleId(),
-                sample.getVisitId(),
+                sample.getVisit() != null ? sample.getVisit().getVisitId() : null,
                 sample.getBarcode(),
-                sample.getSampleTypeId(),
+                sample.getSampleType() != null ? sample.getSampleType().getSampleTypeId() : null,
                 sample.getInitialQuantity(),
                 currentQuantity,
                 sample.getRecommendedStorageMonths(),
                 sample.getActualStorageMonths(),
                 sample.getExpiryStatus(),
-                sample.getContainerId(),
+                sample.getContainer() != null ? sample.getContainer().getContainerId() : null,
                 sample.getCreatedAtSample(),
                 specimenDTOs
         );

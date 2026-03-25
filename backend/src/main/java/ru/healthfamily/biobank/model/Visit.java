@@ -1,15 +1,13 @@
 package ru.healthfamily.biobank.model;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "visits")
@@ -23,11 +21,13 @@ public class Visit {
     @Column(name = "visit_id")
     private Long visitId;
 
-    @Column(name = "patient_id", nullable = false)
-    private Long patientId;
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "patient_id", nullable = false)
+    private Patient patient;
 
-    @Column(name = "research_id", nullable = false)
-    private Long researchId;
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "research_id", nullable = false)
+    private Research research;
 
     @Column(name = "visit_number", nullable = false)
     private Integer visitNumber;
@@ -37,4 +37,7 @@ public class Visit {
 
     @Column(name = "age_at_collection", nullable = false)
     private Integer ageAtCollection;
+
+    @OneToMany(mappedBy = "visit", fetch = FetchType.LAZY)
+    private List<Sample> samples = new ArrayList<>();
 }

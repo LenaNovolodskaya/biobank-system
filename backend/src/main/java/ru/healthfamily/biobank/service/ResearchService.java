@@ -5,7 +5,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.healthfamily.biobank.dto.CreateResearchRequest;
 import ru.healthfamily.biobank.dto.ResearchDTO;
+import ru.healthfamily.biobank.model.Department;
+import ru.healthfamily.biobank.model.FinancingSource;
 import ru.healthfamily.biobank.model.Research;
+import ru.healthfamily.biobank.model.ResearchGroup;
+import ru.healthfamily.biobank.repository.DepartmentRepository;
+import ru.healthfamily.biobank.repository.FinancingSourceRepository;
+import ru.healthfamily.biobank.repository.ResearchGroupRepository;
 import ru.healthfamily.biobank.repository.ResearchRepository;
 import ru.healthfamily.biobank.repository.SampleRepository;
 import ru.healthfamily.biobank.repository.VisitRepository;
@@ -18,6 +24,9 @@ import java.util.stream.Collectors;
 public class ResearchService {
 
     private final ResearchRepository researchRepository;
+    private final ResearchGroupRepository researchGroupRepository;
+    private final FinancingSourceRepository financingSourceRepository;
+    private final DepartmentRepository departmentRepository;
     private final VisitRepository visitRepository;
     private final SampleRepository sampleRepository;
 
@@ -40,13 +49,13 @@ public class ResearchService {
     public void deleteResearch(Long researchId) {
         Research research = researchRepository.findById(researchId)
                 .orElseThrow(() -> new RuntimeException("Исследование не найдено"));
-        List<Long> visitIds = visitRepository.findByResearchId(researchId).stream()
+        List<Long> visitIds = visitRepository.findByResearch_ResearchId(researchId).stream()
                 .map(visit -> visit.getVisitId())
                 .collect(Collectors.toList());
         if (!visitIds.isEmpty()) {
-            sampleRepository.deleteByVisitIdIn(visitIds);
+            sampleRepository.deleteByVisit_VisitIdIn(visitIds);
         }
-        visitRepository.deleteByResearchId(researchId);
+        visitRepository.deleteByResearch_ResearchId(researchId);
         researchRepository.delete(research);
     }
 
@@ -60,9 +69,12 @@ public class ResearchService {
     private void applyRequest(Research research, CreateResearchRequest request) {
         research.setResearchNumber(request.getResearchNumber());
         research.setResearchName(request.getResearchName());
-        research.setResearchGroupId(request.getResearchGroupId());
-        research.setFinancingSourceId(request.getFinancingSourceId());
-        research.setDepartmentId(request.getDepartmentId());
+        research.setResearchGroup(request.getResearchGroupId() != null
+                ? researchGroupRepository.findById(request.getResearchGroupId()).orElse(null) : null);
+        research.setFinancingSource(request.getFinancingSourceId() != null
+                ? financingSourceRepository.findById(request.getFinancingSourceId()).orElse(null) : null);
+        research.setDepartment(request.getDepartmentId() != null
+                ? departmentRepository.findById(request.getDepartmentId()).orElse(null) : null);
         research.setIsActive(request.getIsActive() == null ? true : request.getIsActive());
     }
 
@@ -71,9 +83,9 @@ public class ResearchService {
                 research.getResearchId(),
                 research.getResearchNumber(),
                 research.getResearchName(),
-                research.getResearchGroupId(),
-                research.getFinancingSourceId(),
-                research.getDepartmentId(),
+                research.getResearchGroup() != null ? research.getResearchGroup().getResearchGroupId() : null,
+                research.getFinancingSource() != null ? research.getFinancingSource().getFinancingSourceId() : null,
+                research.getDepartment() != null ? research.getDepartment().getDepartmentId() : null,
                 research.getIsActive()
         );
     }

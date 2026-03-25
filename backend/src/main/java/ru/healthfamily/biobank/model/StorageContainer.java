@@ -2,6 +2,9 @@ package ru.healthfamily.biobank.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+
+import java.util.ArrayList;
+import java.util.List;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
@@ -37,4 +40,10 @@ public class StorageContainer {
     @ManyToOne(optional = false)
     @JoinColumn(name = "template_id", nullable = false)
     private ContainerTypeTemplate template;
+
+    @OneToMany(mappedBy = "container", fetch = FetchType.LAZY)
+    private List<Sample> samples = new ArrayList<>();
+
+    @OneToMany(mappedBy = "container", fetch = FetchType.LAZY)
+    private List<Specimen> specimens = new ArrayList<>();
 }

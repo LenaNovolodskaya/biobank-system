@@ -156,7 +156,8 @@ public class SampleTransactionService {
         TransactionType type = transactionTypeRepository.findByTransactionTypeNameIgnoreCase("Изъвлечён из хранилища")
                 .orElseThrow(() -> new IllegalArgumentException("Тип операции «Изъвлечён из хранилища» не найден"));
 
-        specimen.setSampleStatusId(withdrawnStatusId);
+        specimen.setSampleStatus(sampleStatusRepository.findById(withdrawnStatusId)
+                .orElseThrow(() -> new IllegalArgumentException("Статус не найден")));
         specimenRepository.save(specimen);
 
         return recordSpecimenTransaction(specimen, type, request);
@@ -171,8 +172,11 @@ public class SampleTransactionService {
         TransactionType type = transactionTypeRepository.findByTransactionTypeNameIgnoreCase("Возвращён в хранилище")
                 .orElseThrow(() -> new IllegalArgumentException("Тип операции «Возвращён в хранилище» не найден"));
 
-        specimen.setSampleStatusId(inStorageStatusId);
-        specimen.setContainerId(specimen.getSample() != null ? specimen.getSample().getContainerId() : null);
+        specimen.setSampleStatus(sampleStatusRepository.findById(inStorageStatusId)
+                .orElseThrow(() -> new IllegalArgumentException("Статус не найден")));
+        specimen.setContainer(specimen.getSample() != null && specimen.getSample().getContainer() != null
+                ? specimen.getSample().getContainer()
+                : null);
         specimenRepository.save(specimen);
 
         return recordSpecimenTransaction(specimen, type, request);
@@ -187,8 +191,9 @@ public class SampleTransactionService {
         TransactionType type = transactionTypeRepository.findByTransactionTypeNameIgnoreCase("Исчерпан")
                 .orElseThrow(() -> new IllegalArgumentException("Тип операции «Исчерпан» не найден"));
 
-        specimen.setSampleStatusId(exhaustedStatusId);
-        specimen.setContainerId(null);
+        specimen.setSampleStatus(sampleStatusRepository.findById(exhaustedStatusId)
+                .orElseThrow(() -> new IllegalArgumentException("Статус не найден")));
+        specimen.setContainer(null);
         specimen.setPositionInContainer(null);
         specimenRepository.save(specimen);
 

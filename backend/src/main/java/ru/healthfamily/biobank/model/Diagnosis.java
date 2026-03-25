@@ -1,14 +1,13 @@
 package ru.healthfamily.biobank.model;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "diagnoses")
@@ -27,4 +26,14 @@ public class Diagnosis {
 
     @Column(name = "diagnosis_name", nullable = false)
     private String diagnosisName;
+
+    /** Пациенты с этим диагнозом как основным */
+    @OneToMany(mappedBy = "mainDiagnosis", fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<Patient> patientsWithMainDiagnosis = new ArrayList<>();
+
+    /** Пациенты с этим диагнозом как сопутствующим (через patient_comorbid_diagnoses) */
+    @ManyToMany(mappedBy = "comorbidDiagnoses", fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<Patient> patientsWithComorbidDiagnosis = new ArrayList<>();
 }

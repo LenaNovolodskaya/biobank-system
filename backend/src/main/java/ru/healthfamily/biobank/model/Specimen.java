@@ -24,11 +24,13 @@ public class Specimen {
     @JoinColumn(name = "sample_id", nullable = false)
     private Sample sample;
 
-    @Column(name = "sample_status_id")
-    private Long sampleStatusId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sample_status_id")
+    private SampleStatus sampleStatus;
 
-    @Column(name = "container_id")
-    private Long containerId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "container_id")
+    private StorageContainer container;
 
     @Column(name = "position_in_container")
     private String positionInContainer;

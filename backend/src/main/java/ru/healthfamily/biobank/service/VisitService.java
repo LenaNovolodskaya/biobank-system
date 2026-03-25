@@ -9,6 +9,7 @@ import ru.healthfamily.biobank.dto.CreateVisitRequest;
 import ru.healthfamily.biobank.dto.VisitDTO;
 import ru.healthfamily.biobank.model.Visit;
 import ru.healthfamily.biobank.repository.PatientRepository;
+import ru.healthfamily.biobank.repository.ResearchRepository;
 import ru.healthfamily.biobank.repository.SampleRepository;
 import ru.healthfamily.biobank.repository.VisitRepository;
 import java.time.LocalDate;
@@ -23,6 +24,7 @@ public class VisitService {
     private final VisitRepository visitRepository;
     private final SampleRepository sampleRepository;
     private final PatientRepository patientRepository;
+    private final ResearchRepository researchRepository;
 
     @Transactional
     public VisitDTO createVisit(CreateVisitRequest request) {
@@ -47,7 +49,7 @@ public class VisitService {
     public void deleteVisit(Long visitId) {
         Visit visit = visitRepository.findById(visitId)
                 .orElseThrow(() -> new RuntimeException("Визит не найден"));
-        sampleRepository.deleteByVisitId(visit.getVisitId());
+        sampleRepository.deleteByVisit_VisitId(visit.getVisitId());
         visitRepository.delete(visit);
     }
 
@@ -59,8 +61,10 @@ public class VisitService {
     }
 
     private void applyRequest(Visit visit, CreateVisitRequest request) {
-        visit.setPatientId(request.getPatientId());
-        visit.setResearchId(request.getResearchId());
+        visit.setPatient(patientRepository.findById(request.getPatientId())
+                .orElseThrow(() -> new RuntimeException("Пациент не найден")));
+        visit.setResearch(researchRepository.findById(request.getResearchId())
+                .orElseThrow(() -> new RuntimeException("Исследование не найдено")));
         visit.setVisitNumber(request.getVisitNumber());
         visit.setCollectionDate(request.getCollectionDate() != null
                 ? request.getCollectionDate()
@@ -72,7 +76,7 @@ public class VisitService {
         if (patientId == null || visitNumber == null) {
             return;
         }
-        if (visitRepository.existsByPatientIdAndVisitNumber(patientId, visitNumber)) {
+        if (visitRepository.existsByPatient_PatientIdAndVisitNumber(patientId, visitNumber)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "У пациента уже есть визит с таким номером"
@@ -84,7 +88,7 @@ public class VisitService {
         if (patientId == null || visitNumber == null || visitId == null) {
             return;
         }
-        if (visitRepository.existsByPatientIdAndVisitNumberAndVisitIdNot(
+        if (visitRepository.existsByPatient_PatientIdAndVisitNumberAndVisitIdNot(
                 patientId,
                 visitNumber,
                 visitId
@@ -100,7 +104,7 @@ public class VisitService {
         if (patientId == null || collectionDate == null) {
             return;
         }
-        if (visitRepository.existsByPatientIdAndCollectionDate(patientId, collectionDate)) {
+        if (visitRepository.existsByPatient_PatientIdAndCollectionDate(patientId, collectionDate)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "У пациента уже есть визит на эту дату"
@@ -116,7 +120,7 @@ public class VisitService {
         if (patientId == null || collectionDate == null || visitId == null) {
             return;
         }
-        if (visitRepository.existsByPatientIdAndCollectionDateAndVisitIdNot(
+        if (visitRepository.existsByPatient_PatientIdAndCollectionDateAndVisitIdNot(
                 patientId,
                 collectionDate,
                 visitId
@@ -131,19 +135,24 @@ public class VisitService {
     private VisitDTO toDTO(Visit visit) {
         List<Long> comorbidIds = List.of();
         Long diagnosisId = null;
-        if (visit.getPatientId() != null) {
-            var patientOpt = patientRepository.findById(visit.getPatientId());
+        Long patientId = visit.getPatient() != null ? visit.getPatient().getPatientId() : null;
+        Long researchId = visit.getResearch() != null ? visit.getResearch().getResearchId() : null;
+        if (patientId != null) {
+            var patientOpt = patientRepository.findById(patientId);
             comorbidIds = patientOpt
-                    .map(p -> p.getComorbidDiagnosisIds() == null
+                    .map(p -> p.getComorbidDiagnoses() == null
                             ? List.<Long>of()
-                            : new ArrayList<>(p.getComorbidDiagnosisIds()))
+                            : p.getComorbidDiagnoses().stream()
+                                    .map(d -> d.getDiagnosisId())
+                                    .collect(Collectors.toList()))
                     .orElse(List.of());
-            diagnosisId = patientOpt.map(p -> p.getMainDiagnosisId()).orElse(null);
+            diagnosisId = patientOpt.map(p -> p.getMainDiagnosis() != null
+                    ? p.getMainDiagnosis().getDiagnosisId() : null).orElse(null);
         }
         return new VisitDTO(
                 visit.getVisitId(),
-                visit.getPatientId(),
-                visit.getResearchId(),
+                patientId,
+                researchId,
                 visit.getVisitNumber(),
                 visit.getCollectionDate(),
                 visit.getAgeAtCollection(),

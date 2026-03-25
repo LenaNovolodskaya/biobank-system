@@ -5,8 +5,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.healthfamily.biobank.dto.CreatePatientRequest;
 import ru.healthfamily.biobank.dto.PatientDTO;
+import ru.healthfamily.biobank.model.Diagnosis;
 import ru.healthfamily.biobank.model.Nationality;
 import ru.healthfamily.biobank.model.Patient;
+import ru.healthfamily.biobank.repository.DiagnosisRepository;
 import ru.healthfamily.biobank.repository.NationalityRepository;
 import ru.healthfamily.biobank.repository.PatientRepository;
 import ru.healthfamily.biobank.repository.SampleRepository;
@@ -23,6 +25,7 @@ public class PatientService {
     
     private final PatientRepository patientRepository;
     private final NationalityRepository nationalityRepository;
+    private final DiagnosisRepository diagnosisRepository;
     private final VisitRepository visitRepository;
     private final SampleRepository sampleRepository;
     
@@ -38,11 +41,8 @@ public class PatientService {
         patient.setGender(request.getGender());
         patient.setBirthDate(request.getBirthDate());
         patient.setInformedConsent(request.getInformedConsent());
-        patient.setMainDiagnosisId(request.getMainDiagnosisId());
-        List<Long> comorbid = request.getComorbidDiagnosisIds();
-        patient.setComorbidDiagnosisIds(
-                comorbid == null ? new ArrayList<>() : new ArrayList<>(comorbid)
-        );
+        setMainDiagnosisFromId(patient, request.getMainDiagnosisId());
+        setComorbidDiagnosesFromIds(patient, request.getComorbidDiagnosisIds());
         patient.setCreatedAtPatient(
                 request.getCreatedAtPatient() != null
                         ? request.getCreatedAtPatient()
@@ -96,11 +96,8 @@ public class PatientService {
         patient.setGender(request.getGender());
         patient.setBirthDate(request.getBirthDate());
         patient.setInformedConsent(request.getInformedConsent());
-        patient.setMainDiagnosisId(request.getMainDiagnosisId());
-        List<Long> comorbid = request.getComorbidDiagnosisIds();
-        patient.setComorbidDiagnosisIds(
-                comorbid == null ? new ArrayList<>() : new ArrayList<>(comorbid)
-        );
+        setMainDiagnosisFromId(patient, request.getMainDiagnosisId());
+        setComorbidDiagnosesFromIds(patient, request.getComorbidDiagnosisIds());
         if (request.getCreatedAtPatient() != null) {
             patient.setCreatedAtPatient(request.getCreatedAtPatient());
         }
@@ -121,13 +118,13 @@ public class PatientService {
         if (!patientRepository.existsById(id)) {
             throw new RuntimeException("Пациент не найден");
         }
-        List<Long> visitIds = visitRepository.findByPatientId(id).stream()
+        List<Long> visitIds = visitRepository.findByPatient_PatientId(id).stream()
                 .map(visit -> visit.getVisitId())
                 .collect(Collectors.toList());
         if (!visitIds.isEmpty()) {
-            sampleRepository.deleteByVisitIdIn(visitIds);
+            sampleRepository.deleteByVisit_VisitIdIn(visitIds);
         }
-        visitRepository.deleteByPatientId(id);
+        visitRepository.deleteByPatient_PatientId(id);
         patientRepository.deleteById(id);
     }
     
@@ -139,11 +136,14 @@ public class PatientService {
         dto.setBirthDate(patient.getBirthDate());
         dto.setCreatedAtPatient(patient.getCreatedAtPatient());
         dto.setInformedConsent(patient.getInformedConsent());
-        dto.setMainDiagnosisId(patient.getMainDiagnosisId());
+        dto.setMainDiagnosisId(patient.getMainDiagnosis() != null
+                ? patient.getMainDiagnosis().getDiagnosisId() : null);
         dto.setComorbidDiagnosisIds(
-                patient.getComorbidDiagnosisIds() == null
+                patient.getComorbidDiagnoses() == null
                         ? List.of()
-                        : new ArrayList<>(patient.getComorbidDiagnosisIds())
+                        : patient.getComorbidDiagnoses().stream()
+                                .map(Diagnosis::getDiagnosisId)
+                                .collect(Collectors.toList())
         );
         
         if (patient.getNationality() != null) {
@@ -152,5 +152,27 @@ public class PatientService {
         }
         
         return dto;
+    }
+
+    private void setMainDiagnosisFromId(Patient patient, Long diagnosisId) {
+        if (diagnosisId == null) {
+            patient.setMainDiagnosis(null);
+        } else {
+            Diagnosis diagnosis = diagnosisRepository.findById(diagnosisId)
+                    .orElseThrow(() -> new RuntimeException("Диагноз не найден"));
+            patient.setMainDiagnosis(diagnosis);
+        }
+    }
+
+    private void setComorbidDiagnosesFromIds(Patient patient, List<Long> diagnosisIds) {
+        if (diagnosisIds == null || diagnosisIds.isEmpty()) {
+            patient.setComorbidDiagnoses(new ArrayList<>());
+        } else {
+            patient.setComorbidDiagnoses(diagnosisIds.stream()
+                    .map(diagnosisRepository::findById)
+                    .filter(java.util.Optional::isPresent)
+                    .map(java.util.Optional::get)
+                    .collect(Collectors.toList()));
+        }
     }
 }
