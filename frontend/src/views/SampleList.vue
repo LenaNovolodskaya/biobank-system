@@ -17,6 +17,7 @@
         </svg>
       </button>
       <button
+        v-if="canCreate"
         class="icon-button header-button"
         type="button"
         title="Импорт из Excel"
@@ -557,6 +558,9 @@
           <h3>{{ modalTitle }}</h3>
           <button class="btn btn-secondary" @click="closeModal">Закрыть</button>
         </div>
+        <div v-if="errorMessage" class="alert alert-danger modal-alert">
+          {{ errorMessage }}
+        </div>
 
         <form class="form-grid" @submit.prevent="submitModal">
           <div class="form-group">
@@ -847,11 +851,15 @@
             @change="onImportFileChange"
           />
         </div>
+        <p class="import-hint">
+          Для импорта файл должен содержать обязательные столбцы:
+          <strong>Штрихкод</strong>, <strong>ID визита</strong>. Опциональные
+          столбцы: Тип образца, Контейнер, Начальное количество, Текущее
+          количество, Дата забора, Рекомендованный срок хранения. Для импорта
+          проб добавьте столбцы: Штрихкод пробы, Статус пробы, Позиция пробы.
+        </p>
         <p v-if="importPreviewRows.length > 0" class="import-hint">
-          Найдено {{ importPreviewRows.length }} строк. Для импорта файл должен
-          содержать столбцы: Штрихкод, ID визита, Тип образца (или ID),
-          Контейнер (название или ID), Начальное количество, Текущее количество,
-          Дата забора.
+          Найдено {{ importPreviewRows.length }} строк.
         </p>
         <div v-if="importPreviewRows.length > 0" class="import-preview-wrapper">
           <table class="import-preview-table">
@@ -878,7 +886,7 @@
           </p>
         </div>
         <div v-if="importError" class="alert alert-danger">
-          {{ importError }}
+          <pre>{{ importError }}</pre>
         </div>
         <div class="form-actions">
           <button
@@ -1332,27 +1340,29 @@ export default defineComponent({
       const activeFilters = this.filterRows.filter(
         (r) => r.fieldKey && this.isFilterValueActive(r.fieldKey, r.value)
       );
-      if (activeFilters.length === 0) {
-        return this.samples;
-      }
-      const byField = new Map<string, Array<string | number | null>>();
-      for (const f of activeFilters) {
-        let arr = byField.get(f.fieldKey);
-        if (!arr) {
-          arr = [];
-          byField.set(f.fieldKey, arr);
+      let result = this.samples;
+      if (activeFilters.length > 0) {
+        const byField = new Map<string, Array<string | number | null>>();
+        for (const f of activeFilters) {
+          let arr = byField.get(f.fieldKey);
+          if (!arr) {
+            arr = [];
+            byField.set(f.fieldKey, arr);
+          }
+          arr.push(f.value);
         }
-        arr.push(f.value);
+        result = this.samples.filter((sample) => {
+          for (const [fieldKey, values] of byField) {
+            const matchesAny = values.some((v) =>
+              this.sampleMatchesFilter(sample, fieldKey, v)
+            );
+            if (!matchesAny) return false;
+          }
+          return true;
+        });
       }
-      return this.samples.filter((sample) => {
-        for (const [fieldKey, values] of byField) {
-          const matchesAny = values.some((v) =>
-            this.sampleMatchesFilter(sample, fieldKey, v)
-          );
-          if (!matchesAny) return false;
-        }
-        return true;
-      });
+      // Always sort by sampleId to maintain consistent ordering
+      return [...result].sort((a, b) => a.sampleId - b.sampleId);
     },
   },
   created() {
@@ -1426,9 +1436,14 @@ export default defineComponent({
       this.errorMessage = "";
       try {
         const response = await axios.get("/samples");
-        this.samples = [...response.data].sort(
-          (a: Sample, b: Sample) => a.sampleId - b.sampleId
-        );
+        this.samples = [...response.data]
+          .sort((a: Sample, b: Sample) => a.sampleId - b.sampleId)
+          .map((sample: Sample) => ({
+            ...sample,
+            specimens: (sample.specimens || []).sort(
+              (a: Specimen, b: Specimen) => a.specimenId - b.specimenId
+            ),
+          }));
       } catch (error) {
         console.error("Ошибка при загрузке образцов:", error);
         this.errorMessage = "Не удалось загрузить образцы";
@@ -1594,7 +1609,9 @@ export default defineComponent({
       this.modalSample.specimens = result;
     },
     getSampleSpecimens(sample: Sample): Specimen[] {
-      return sample.specimens || [];
+      const specimens = sample.specimens || [];
+      // Always maintain sorted order by specimenId
+      return [...specimens].sort((a, b) => a.specimenId - b.specimenId);
     },
     positionsForSpecimenContainer(
       containerId: number | null,
@@ -1655,11 +1672,11 @@ export default defineComponent({
       this.expandedSampleIds = next;
     },
     editSampleRow(sampleId: number) {
-      this.selectedSampleId = sampleId;
+      this.selectedSampleId = Number(sampleId);
       this.openEditModal();
     },
     deleteSampleRow(sampleId: number) {
-      this.selectedSampleId = sampleId;
+      this.selectedSampleId = Number(sampleId);
       this.deleteSample();
     },
     openCreateModal() {
@@ -1687,7 +1704,7 @@ export default defineComponent({
       this.errorMessage = "";
       this.successMessage = "";
       const sample = this.samples.find(
-        (item) => item.sampleId === this.selectedSampleId
+        (item) => Number(item.sampleId) === this.selectedSampleId
       );
       if (!sample) {
         return;
@@ -1792,7 +1809,7 @@ export default defineComponent({
       }
     },
     async updateSample() {
-      if (!this.selectedSampleId) {
+      if (this.selectedSampleId == null) {
         return;
       }
       try {
@@ -1812,7 +1829,7 @@ export default defineComponent({
       }
     },
     async deleteSample() {
-      if (!this.selectedSampleId) {
+      if (this.selectedSampleId == null) {
         return;
       }
       const confirmed = window.confirm("Удалить выбранный образец?");
@@ -2028,15 +2045,35 @@ export default defineComponent({
         this.errorMessage = "Выберите хотя бы один столбец для экспорта";
         return;
       }
-      const headers = cols.map((c) => c.label);
-      const rows = this.filteredSamples.map((sample) =>
-        cols.map((col) => {
+      const specimenHeaders = [
+        "Штрихкод пробы",
+        "Статус пробы",
+        "Позиция пробы",
+      ];
+      const headers = [...cols.map((c) => c.label), ...specimenHeaders];
+      const rows: string[][] = [];
+
+      this.filteredSamples.forEach((sample) => {
+        const sampleValues = cols.map((col) => {
           const v = this.formatValue(sample, col.key);
           return v === "—" ? "" : String(v);
-        })
-      );
-      const wsData = [headers, ...rows];
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
+        });
+        const specimens = this.getSampleSpecimens(sample);
+        if (specimens.length > 0) {
+          specimens.forEach((specimen) => {
+            rows.push([
+              ...sampleValues,
+              specimen.barcode || "",
+              this.getSampleStatusName(specimen.sampleStatusId),
+              specimen.positionInContainer || "",
+            ]);
+          });
+        } else {
+          rows.push([...sampleValues, "", "", ""]);
+        }
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Образцы");
       const fileName = `образцы_${new Date().toISOString().slice(0, 10)}.xlsx`;
@@ -2128,8 +2165,24 @@ export default defineComponent({
         return;
       }
 
-      let created = 0;
-      let failed = 0;
+      type ImportedSample = {
+        visitId: number;
+        barcode: string;
+        sampleTypeId: number | null;
+        containerId: number | null;
+        initialQuantity: number | null;
+        recommendedStorageMonths: number | null;
+        collectionDate: string | null;
+        specimens: Array<{
+          barcode: string;
+          sampleStatusId: number | null;
+          containerId: number | null;
+          positionInContainer: string;
+        }>;
+      };
+
+      const sampleGroups = new Map<string, ImportedSample>();
+
       for (const row of this.importPreviewRows) {
         const getRowVal = (key: string) => {
           const idx = colIndex.get(key);
@@ -2142,44 +2195,98 @@ export default defineComponent({
         const visitIdNum = Number(visitId);
         if (!Number.isFinite(visitIdNum)) continue;
 
-        const sampleTypeId = this.resolveImportSampleType(
-          getRowVal("sampleTypeId")
-        );
-        const containerId = this.resolveImportContainer(
-          getRowVal("containerId")
-        );
-        const initialQty =
-          this.toNullableNumber(Number(getRowVal("initialQuantity") ?? 1)) ?? 1;
-        const currentQty =
-          this.toNullableNumber(
-            Number(getRowVal("currentQuantity") ?? initialQty)
-          ) ?? initialQty;
-        const recommended = this.toNullableRecommendedMonths(
-          getRowVal("recommendedStorageMonths") ?? undefined
-        );
-        const collectionDate = getRowVal("createdAtSample");
-        const collectionDateFormatted = collectionDate
-          ? this.toDatetimeLocal(collectionDate.replace(" ", "T").slice(0, 16))
-          : null;
-
-        try {
-          await axios.post("/samples", {
+        const groupKey = `${visitIdNum}::${barcode}`;
+        if (!sampleGroups.has(groupKey)) {
+          const sampleTypeId = this.resolveImportSampleType(
+            getRowVal("sampleTypeId")
+          );
+          const containerId = this.resolveImportContainer(
+            getRowVal("containerId")
+          );
+          const initialQty = this.toNullableNumber(
+            Number(getRowVal("initialQuantity") ?? NaN)
+          );
+          const recommended = this.toNullableRecommendedMonths(
+            getRowVal("recommendedStorageMonths") ?? undefined
+          );
+          const collectionDate = getRowVal("createdAtSample");
+          const collectionDateFormatted = collectionDate
+            ? this.toDatetimeLocal(
+                collectionDate.replace(" ", "T").slice(0, 16)
+              )
+            : null;
+          sampleGroups.set(groupKey, {
             visitId: visitIdNum,
             barcode,
             sampleTypeId,
-            initialQuantity: initialQty,
-            currentQuantity: currentQty,
-            recommendedStorageMonths: recommended,
             containerId,
+            initialQuantity: initialQty,
+            recommendedStorageMonths: recommended,
             collectionDate: collectionDateFormatted,
             specimens: [],
+          });
+        }
+
+        const sampleGroup = sampleGroups.get(groupKey);
+        const specimenBarcode = getRowVal("specimenBarcode")?.trim();
+        if (specimenBarcode && sampleGroup) {
+          sampleGroup.specimens.push({
+            barcode: specimenBarcode,
+            sampleStatusId: this.resolveImportSpecimenStatus(
+              getRowVal("specimenStatusId")
+            ),
+            containerId: sampleGroup.containerId,
+            positionInContainer: getRowVal("specimenPosition") || "",
+          });
+        }
+      }
+
+      let created = 0;
+      let failed = 0;
+      const failedSamples: string[] = [];
+      for (const sampleGroup of sampleGroups.values()) {
+        const initialQty =
+          sampleGroup.initialQuantity ??
+          Math.max(sampleGroup.specimens.length, 1);
+        const currentQty =
+          sampleGroup.specimens.length > 0
+            ? sampleGroup.specimens.length
+            : initialQty;
+        try {
+          await axios.post("/samples", {
+            visitId: sampleGroup.visitId,
+            barcode: sampleGroup.barcode,
+            sampleTypeId: sampleGroup.sampleTypeId,
+            initialQuantity: initialQty,
+            currentQuantity: currentQty,
+            recommendedStorageMonths: sampleGroup.recommendedStorageMonths,
+            containerId: sampleGroup.containerId,
+            collectionDate: sampleGroup.collectionDate,
+            specimens: sampleGroup.specimens,
           });
           created++;
         } catch (err) {
           console.error(err);
           failed++;
+          const barcode = sampleGroup.barcode;
+          if (axios.isAxiosError(err)) {
+            const responseData = err.response?.data as
+              | { message?: string }
+              | undefined;
+            const errorMsg = responseData?.message || "Неизвестная ошибка";
+            let displayMsg = errorMsg;
+            if (
+              errorMsg.startsWith("Образец с таким штрихкодом уже существует:")
+            ) {
+              displayMsg = "образец с таким штрихкодом уже существует.";
+            }
+            failedSamples.push(`${barcode}: ${displayMsg}`);
+          } else {
+            failedSamples.push(`${barcode}: Ошибка сети`);
+          }
         }
       }
+
       this.importInProgress = false;
       if (created > 0) {
         this.successMessage = `Импортировано ${created} образцов`;
@@ -2187,7 +2294,9 @@ export default defineComponent({
         this.closeImportModal();
       }
       if (failed > 0) {
-        this.importError = `Не удалось импортировать ${failed} записей`;
+        this.importError = `Не удалось импортировать ${failed} записей:\n${failedSamples.join(
+          "\n"
+        )}`;
       }
     },
     matchImportHeader(h: string): string | null {
@@ -2204,8 +2313,20 @@ export default defineComponent({
         "Дата забора": "createdAtSample",
         "Рек. хранение": "recommendedStorageMonths",
         "Рекомендованный срок хранения": "recommendedStorageMonths",
+        "Штрихкод пробы": "specimenBarcode",
+        "Статус пробы": "specimenStatusId",
+        "Позиция пробы": "specimenPosition",
       };
       return m[h] ?? null;
+    },
+    resolveImportSpecimenStatus(val: string | undefined): number | null {
+      if (!val || val === "—") return null;
+      const n = Number(val);
+      if (Number.isFinite(n)) return n;
+      const status = this.sampleStatuses.find(
+        (s) => s.sampleStatusName?.toLowerCase() === String(val).toLowerCase()
+      );
+      return status?.sampleStatusId ?? null;
     },
     resolveImportSampleType(val: string | undefined): number | null {
       if (!val || val === "—") return null;

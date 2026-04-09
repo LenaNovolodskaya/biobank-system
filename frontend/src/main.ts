@@ -21,6 +21,7 @@ axios.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      alert("Время сессии истекло. Пожалуйста, войдите в систему заново.");
       store.commit("clearAuth");
       if (
         router.currentRoute.value.path !== "/login" &&
@@ -28,6 +29,7 @@ axios.interceptors.response.use(
       ) {
         router.push("/login");
       }
+      return;
     }
     return Promise.reject(error);
   }

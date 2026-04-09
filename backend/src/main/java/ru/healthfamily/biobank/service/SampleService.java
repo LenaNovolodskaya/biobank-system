@@ -90,6 +90,9 @@ public class SampleService {
         if (request.getVisitId() == null || !visitRepository.existsById(request.getVisitId())) {
             throw new IllegalArgumentException("Нельзя создать образец: данного визита не существует.");
         }
+        if (request.getBarcode() != null && sampleRepository.existsByBarcode(request.getBarcode())) {
+            throw new IllegalArgumentException("Образец с таким штрихкодом уже существует: " + request.getBarcode());
+        }
         Sample sample = new Sample();
         applyRequest(sample, request);
         Sample saved = sampleRepository.save(sample);
@@ -113,6 +116,12 @@ public class SampleService {
                 .map(s -> s.getContainer() != null ? s.getContainer().getContainerId() : null)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
+        // Clear references in transactions to allow specimen deletion
+        try {
+            sampleTransactionService.clearSampleAndSpecimenReferences(sampleId);
+        } catch (Exception e) {
+            // ignore - journal is optional
+        }
         applyRequest(sample, request);
         Sample saved = sampleRepository.save(sample);
         java.util.Set<Long> newContainerIds = saved.getSpecimens().stream()
@@ -130,6 +139,10 @@ public class SampleService {
         Sample sample = sampleRepository.findById(sampleId)
                 .orElseThrow(() -> new RuntimeException("Образец не найден"));
         try {
+            // Если в `sample_transactions` уже есть ссылки на `specimens` этого образца,
+            // то при каскадном удалении specimens сработает FK-ограничение.
+            // Обнуляем связи в истории, чтобы удаление прошло.
+            sampleTransactionService.clearSampleAndSpecimenReferences(sampleId);
             sampleTransactionService.recordSampleWithdrawn(sample);
         } catch (Exception e) {
             // ignore - journal is optional

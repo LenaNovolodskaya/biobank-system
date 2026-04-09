@@ -268,6 +268,10 @@
           <button class="btn btn-secondary" @click="closeModal">Закрыть</button>
         </div>
 
+        <div v-if="errorMessage" class="alert alert-danger modal-alert">
+          {{ errorMessage }}
+        </div>
+
         <form class="form-grid" @submit.prevent="submitModal">
           <div class="form-group">
             <label for="modalPatient">Пациент *</label>
@@ -379,6 +383,11 @@
             Закрыть
           </button>
         </div>
+
+        <div v-if="errorMessage" class="alert alert-danger modal-alert">
+          {{ errorMessage }}
+        </div>
+
         <form class="form-grid" @submit.prevent="submitDiagnosisModal">
           <div class="form-group">
             <label for="refIcd">Код МКБ‑10</label>
@@ -805,14 +814,13 @@ export default defineComponent({
     },
     handlePatientSelection() {
       this.updateAgeFromSelection();
-      if (this.modalMode !== "create") {
-        return;
-      }
       const patient = this.patients.find(
         (item) => item.patientId === this.modalVisit.patientId
       );
       if (patient) {
-        this.modalVisit.diagnosisId = patient.mainDiagnosisId ?? null;
+        if (this.modalMode === "create") {
+          this.modalVisit.diagnosisId = patient.mainDiagnosisId ?? null;
+        }
         this.modalVisit.visitNumber = this.getNextVisitNumber(
           patient.patientId
         );

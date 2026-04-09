@@ -729,6 +729,11 @@
                 </button>
               </div>
             </div>
+
+            <div v-if="errorMessage" class="alert alert-danger modal-alert">
+              {{ errorMessage }}
+            </div>
+
             <div
               v-if="drawerContainer || selectedCell"
               class="drawer-path-block"
@@ -938,6 +943,10 @@
         <div class="modal-header">
           <h3>{{ modalTitle }}</h3>
           <button class="btn btn-secondary" @click="closeModal">Закрыть</button>
+        </div>
+
+        <div v-if="errorMessage" class="alert alert-danger modal-alert">
+          {{ errorMessage }}
         </div>
 
         <form class="form-grid" @submit.prevent="submitModal">
@@ -1284,6 +1293,11 @@
             Закрыть
           </button>
         </div>
+
+        <div v-if="errorMessage" class="alert alert-danger modal-alert">
+          {{ errorMessage }}
+        </div>
+
         <form class="form-grid" @submit.prevent="submitUnitTypeRefModal">
           <div class="form-group">
             <label for="unitTypeRefName">Название</label>
@@ -1323,6 +1337,11 @@
             Закрыть
           </button>
         </div>
+
+        <div v-if="errorMessage" class="alert alert-danger modal-alert">
+          {{ errorMessage }}
+        </div>
+
         <form class="form-grid" @submit.prevent="submitTemplateRefModal">
           <div class="form-group">
             <label for="templateRefName">Название *</label>
@@ -1397,6 +1416,11 @@
             Закрыть
           </button>
         </div>
+
+        <div v-if="errorMessage" class="alert alert-danger modal-alert">
+          {{ errorMessage }}
+        </div>
+
         <form @submit.prevent="submitSpecimenAction">
           <div class="form-group">
             <label>Дата и время операции *</label>

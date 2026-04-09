@@ -3,9 +3,11 @@ package ru.healthfamily.biobank.repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 import ru.healthfamily.biobank.model.SampleTransaction;
 
 import java.util.List;
@@ -39,4 +41,15 @@ public interface SampleTransactionRepository extends JpaRepository<SampleTransac
            "WHERE sp.specimenId = :specimenId " +
            "ORDER BY t.transactionDate ASC")
     List<SampleTransaction> findBySpecimenIdWithDetails(@Param("specimenId") Long specimenId);
+
+    /**
+     * Чтобы можно было удалять `samples/specimens`, но при этом сохранить строки истории
+     * в `sample_transactions` (barcode хранится в отдельных колонках).
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE SampleTransaction t " +
+           "SET t.sample = null, t.specimen = null " +
+           "WHERE t.sample.sampleId = :sampleId")
+    int clearSampleAndSpecimenReferences(@Param("sampleId") Long sampleId);
 }

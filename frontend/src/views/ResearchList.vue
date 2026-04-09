@@ -215,6 +215,10 @@
           <button class="btn btn-secondary" @click="closeModal">Закрыть</button>
         </div>
 
+        <div v-if="errorMessage" class="alert alert-danger modal-alert">
+          {{ errorMessage }}
+        </div>
+
         <form class="form-grid" @submit.prevent="submitModal">
           <div class="form-group">
             <label for="modalNumber">Номер *</label>
@@ -475,6 +479,11 @@
             Закрыть
           </button>
         </div>
+
+        <div v-if="errorMessage" class="alert alert-danger modal-alert">
+          {{ errorMessage }}
+        </div>
+
         <form class="form-grid" @submit.prevent="submitRefModal">
           <div class="form-group">
             <label for="refName">Название</label>

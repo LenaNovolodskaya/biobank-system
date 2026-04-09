@@ -7,6 +7,8 @@ import java.util.Collection;
 
 @Repository
 public interface SampleRepository extends JpaRepository<Sample, Long> {
+    boolean existsByBarcode(String barcode);
+
     void deleteByVisit_VisitId(Long visitId);
 
     void deleteByVisit_VisitIdIn(Collection<Long> visitIds);
