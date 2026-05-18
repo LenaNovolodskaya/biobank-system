@@ -5,6 +5,8 @@ import lombok.Data;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
+
+import ru.healthfamily.biobank.model.Role;
 import ru.healthfamily.biobank.model.User;
 import ru.healthfamily.biobank.model.UserPermissionOverride;
 
@@ -73,6 +75,12 @@ public class CustomUserDetails implements UserDetails {
             "patient.view", "visit.view", "sample.view", "research.view",
             "storage.view", "reference.view"
     );
+
+    public Set<String> getRoleNames() {
+        return user.getRoles().stream()
+                .map(Role::getRoleName)
+                .collect(Collectors.toSet());
+    }
 
     private Set<String> getEffectivePermissionNames() {
         Set<String> inherited = user.getRoles().stream()

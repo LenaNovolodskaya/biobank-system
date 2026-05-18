@@ -24,6 +24,16 @@
             <div class="k">ФИО</div>
             <div class="v">{{ me.fullName }}</div>
           </div>
+          <div class="kv">
+            <div class="k">Роль</div>
+            <div class="v">
+              {{
+                me.roleNames && me.roleNames.length
+                  ? me.roleNames.join(", ")
+                  : "—"
+              }}
+            </div>
+          </div>
         </div>
 
         <div class="info-block profile-perms">
@@ -54,6 +64,7 @@ type MeResponse = {
   fullName: string;
   userId: number;
   permissions: string[];
+  roleNames: string[];
 };
 
 export default defineComponent({
@@ -199,6 +210,7 @@ export default defineComponent({
           fullName: data.fullName,
           userId: data.userId,
           permissions,
+          roleNames: data.roleNames || [],
         };
       } catch {
         this.error = "Не удалось загрузить профиль";

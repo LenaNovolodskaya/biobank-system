@@ -3,6 +3,7 @@ package ru.healthfamily.biobank.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import ru.healthfamily.biobank.dto.AuthResponse;
@@ -20,7 +21,7 @@ public class AuthController {
     private final AuthService authService;
 
     @GetMapping("/me")
-    @org.springframework.security.access.prepost.PreAuthorize("isAuthenticated()")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<CurrentUserResponse> getCurrentUser(
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
@@ -31,7 +32,8 @@ public class AuthController {
                 userDetails.getUsername(),
                 userDetails.getFullName(),
                 userDetails.getUserId(),
-                userDetails.getPermissionNames()
+                userDetails.getPermissionNames(),
+                userDetails.getRoleNames() 
         ));
     }
 

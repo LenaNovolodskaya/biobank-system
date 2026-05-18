@@ -24,9 +24,16 @@
             <div class="k">ФИО</div>
             <div class="v">{{ user.fullName }}</div>
           </div>
-          <router-link to="/users" class="btn btn-secondary btn-sm back-btn">
-            Назад к списку пользователей
-          </router-link>
+          <div class="kv">
+            <div class="k">Роль</div>
+            <div class="v">
+              {{
+                user.roleNames && user.roleNames.length
+                  ? user.roleNames.join(", ")
+                  : "—"
+              }}
+            </div>
+          </div>
         </div>
 
         <div class="info-block profile-perms">
@@ -438,6 +445,7 @@ export default defineComponent({
           userId: userData.userId,
           username: userData.username,
           fullName: userData.fullName,
+          roleNames: userData.roleNames || [],
           permissions,
         };
 

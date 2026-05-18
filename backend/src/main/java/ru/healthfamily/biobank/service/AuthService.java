@@ -10,7 +10,9 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.healthfamily.biobank.dto.AuthResponse;
 import ru.healthfamily.biobank.dto.LoginRequest;
 import ru.healthfamily.biobank.dto.RegisterRequest;
+import ru.healthfamily.biobank.model.Role;
 import ru.healthfamily.biobank.model.User;
+import ru.healthfamily.biobank.repository.RoleRepository;
 import ru.healthfamily.biobank.repository.UserRepository;
 import ru.healthfamily.biobank.security.CustomUserDetails;
 import ru.healthfamily.biobank.security.JwtTokenProvider;
@@ -22,23 +24,28 @@ import java.util.Set;
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManager authenticationManager;
+    
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
-            throw new IllegalArgumentException("Пользователь с таким именем уже существует");
+                throw new IllegalArgumentException("Пользователь с таким именем уже существует");
         }
 
-        // Самостоятельная регистрация — без ролей, только просмотр (DEFAULT_VIEW_ONLY в CustomUserDetails)
+        // Находим роль "Пользователь"
+        Role userRole = roleRepository.findByRoleName("Пользователь")
+                .orElseThrow(() -> new IllegalStateException("Роль 'Пользователь' не найдена в системе"));
+
         User user = new User();
         user.setUsername(request.getUsername());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setFullName(request.getFullName());
         user.setIsActive(true);
-        // Не назначаем роль — пользователь получит DEFAULT_VIEW_ONLY
+        user.getRoles().add(userRole); // Назначаем роль
 
         user = userRepository.save(user);
 
@@ -55,9 +62,10 @@ public class AuthService {
                 user.getUsername(),
                 user.getFullName(),
                 user.getUserId(),
-                permissions
+                permissions,
+                userDetails.getRoleNames()
         );
-    }
+        }
 
     public AuthResponse login(LoginRequest request) {
         Authentication authentication = authenticationManager.authenticate(
@@ -77,7 +85,8 @@ public class AuthService {
                 userDetails.getUsername(),
                 userDetails.getFullName(),
                 userDetails.getUserId(),
-                permissions
+                permissions,
+                userDetails.getRoleNames()
         );
     }
 }
