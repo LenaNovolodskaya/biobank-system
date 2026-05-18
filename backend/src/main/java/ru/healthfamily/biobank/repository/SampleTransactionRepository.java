@@ -42,10 +42,6 @@ public interface SampleTransactionRepository extends JpaRepository<SampleTransac
            "ORDER BY t.transactionDate ASC")
     List<SampleTransaction> findBySpecimenIdWithDetails(@Param("specimenId") Long specimenId);
 
-    /**
-     * Чтобы можно было удалять `samples/specimens`, но при этом сохранить строки истории
-     * в `sample_transactions` (barcode хранится в отдельных колонках).
-     */
     @Modifying
     @Transactional
     @Query("UPDATE SampleTransaction t " +

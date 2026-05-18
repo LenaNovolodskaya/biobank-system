@@ -17,7 +17,6 @@ import ru.healthfamily.biobank.repository.PatientRepository;
 import ru.healthfamily.biobank.repository.SampleRepository;
 import ru.healthfamily.biobank.repository.VisitRepository;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -31,11 +30,9 @@ public class PatientService {
     private final NationalityRepository nationalityRepository;
     private final DiagnosisRepository diagnosisRepository;
     private final VisitRepository visitRepository;
-    private final SampleRepository sampleRepository;
     
     @Transactional
     public PatientDTO createPatient(CreatePatientRequest request) {
-        // Проверяем уникальность штрихкода
         if (patientRepository.existsByPatientBarcode(request.getPatientBarcode())) {
             throw new RuntimeException("Пациент с таким штрихкодом уже существует");
         }
@@ -53,7 +50,6 @@ public class PatientService {
                         : LocalDate.now().atTime(8, 0)
         );
         
-        // Если указана национальность, находим её
         if (request.getNationalityId() != null) {
             Nationality nationality = nationalityRepository.findById(request.getNationalityId())
                     .orElseThrow(() -> new RuntimeException("Национальность не найдена"));

@@ -225,7 +225,15 @@
                 placeholder="Дата от"
               />
             </template>
-            <template v-else-if="row.fieldKey === 'actualStorageMonthsMin'">
+            <template v-else-if="row.fieldKey === 'createdAtSampleTo'">
+              <input
+                v-model="row.value"
+                type="date"
+                class="form-control"
+                placeholder="Дата до"
+              />
+            </template>
+            <template v-else-if="row.fieldKey === 'actualStorageMonths'">
               <input
                 v-model.number="row.value"
                 type="number"
@@ -1140,9 +1148,10 @@ export default defineComponent({
         { key: "initialQuantity", label: "Начальное количество" },
         { key: "currentQuantity", label: "Текущее количество" },
         { key: "createdAtSampleFrom", label: "Дата забора от" },
+        { key: "createdAtSampleTo", label: "Дата забора до" },
         {
-          key: "actualStorageMonthsMin",
-          label: "Фактический срок хранения от",
+          key: "actualStorageMonths",
+          label: "Фактический срок хранения",
         },
         {
           key: "recommendedStorageMonths",
@@ -1935,13 +1944,14 @@ export default defineComponent({
         fieldKey === "initialQuantity" ||
         fieldKey === "currentQuantity" ||
         fieldKey === "recommendedStorageMonths" ||
-        fieldKey === "actualStorageMonthsMin"
+        fieldKey === "actualStorageMonths"
       ) {
         const num = Number(value);
         return Number.isFinite(num) && num >= 0;
       }
       if (
         fieldKey === "createdAtSampleFrom" ||
+        fieldKey === "createdAtSampleTo" ||
         fieldKey === "patientBirthDateFrom"
       ) {
         return typeof value === "string" && value.trim().length > 0;
@@ -1982,10 +1992,15 @@ export default defineComponent({
         const filterDate = this.getDateOnly(value as string);
         return !filterDate || !sampleDate || sampleDate >= filterDate;
       }
-      if (fieldKey === "actualStorageMonthsMin") {
+      if (fieldKey === "createdAtSampleTo") {
+        const sampleDate = this.getDateOnly(sample.createdAtSample);
+        const filterDate = this.getDateOnly(value as string);
+        return !filterDate || !sampleDate || sampleDate <= filterDate;
+      }
+      if (fieldKey === "actualStorageMonths") {
         const months = this.getActualStorageMonthsNumber(sample);
-        const minVal = Number(value);
-        return !Number.isFinite(minVal) || (months != null && months >= minVal);
+        const val = Number(value);
+        return !Number.isFinite(val) || (months != null && months === val);
       }
       if (fieldKey === "patientBirthDateFrom") {
         const patient = this.getPatientByVisit(sample.visitId);

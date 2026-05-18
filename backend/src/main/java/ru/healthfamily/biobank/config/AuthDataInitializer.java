@@ -66,7 +66,6 @@ public class AuthDataInitializer implements CommandLineRunner {
             log.info("Инициализация авторизации завершена");
         }
 
-        // Всегда проверяем: если admin отсутствует — создаём (в т.ч. после удаления или при частичной инициализации)
         if (!userRepository.existsByUsername("admin") && adminRole != null) {
             User admin = new User();
             admin.setUsername("admin");

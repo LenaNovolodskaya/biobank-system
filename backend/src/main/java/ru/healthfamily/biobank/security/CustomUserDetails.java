@@ -88,7 +88,6 @@ public class CustomUserDetails implements UserDetails {
                         .map(p -> p.getPermissionName()))
                 .collect(Collectors.toSet());
 
-        // Если у пользователя нет ролей — только просмотр (обычный пользователь)
         if (inherited.isEmpty()) {
             return new java.util.HashSet<>(DEFAULT_VIEW_ONLY);
         }

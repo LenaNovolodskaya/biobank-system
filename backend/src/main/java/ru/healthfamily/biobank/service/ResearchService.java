@@ -7,17 +7,12 @@ import ru.healthfamily.biobank.dto.CreateResearchRequest;
 import ru.healthfamily.biobank.dto.DeleteCheckResponse;
 import ru.healthfamily.biobank.dto.ResearchDTO;
 import ru.healthfamily.biobank.exception.ResearchHasLinkedVisitsException;
-import ru.healthfamily.biobank.model.Department;
-import ru.healthfamily.biobank.model.FinancingSource;
 import ru.healthfamily.biobank.model.Research;
-import ru.healthfamily.biobank.model.ResearchGroup;
 import ru.healthfamily.biobank.repository.DepartmentRepository;
 import ru.healthfamily.biobank.repository.FinancingSourceRepository;
 import ru.healthfamily.biobank.repository.ResearchGroupRepository;
 import ru.healthfamily.biobank.repository.ResearchRepository;
-import ru.healthfamily.biobank.repository.SampleRepository;
 import ru.healthfamily.biobank.repository.VisitRepository;
-import java.util.List;
 import java.util.List;
 import java.util.Comparator;
 import java.util.stream.Collectors;
@@ -31,7 +26,6 @@ public class ResearchService {
     private final FinancingSourceRepository financingSourceRepository;
     private final DepartmentRepository departmentRepository;
     private final VisitRepository visitRepository;
-    private final SampleRepository sampleRepository;
 
     @Transactional
     public ResearchDTO createResearch(CreateResearchRequest request) {

@@ -12,8 +12,6 @@ import ru.healthfamily.biobank.model.Sample;
 import ru.healthfamily.biobank.model.Visit;
 import ru.healthfamily.biobank.model.SampleStatus;
 import ru.healthfamily.biobank.model.Sample.ExpiryStatus;
-import ru.healthfamily.biobank.model.SampleType;
-import ru.healthfamily.biobank.model.StorageContainer;
 import ru.healthfamily.biobank.repository.SpecimenRepository;
 import ru.healthfamily.biobank.repository.SampleRepository;
 import ru.healthfamily.biobank.repository.SampleStatusRepository;
@@ -22,7 +20,6 @@ import ru.healthfamily.biobank.repository.StorageContainerRepository;
 import ru.healthfamily.biobank.repository.VisitRepository;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.Period;
 import java.util.ArrayList;
 import java.util.List;
@@ -99,9 +96,7 @@ public class SampleService {
         updateContainerCountsFromSpecimens(saved.getSpecimens());
         try {
             sampleTransactionService.recordSampleCreated(saved);
-        } catch (Exception e) {
-            // ignore - journal is optional
-        }
+        } catch (Exception e) {}
         return toDTO(saved);
     }
 
@@ -116,12 +111,9 @@ public class SampleService {
                 .map(s -> s.getContainer() != null ? s.getContainer().getContainerId() : null)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-        // Clear references in transactions to allow specimen deletion
         try {
             sampleTransactionService.clearSampleAndSpecimenReferences(sampleId);
-        } catch (Exception e) {
-            // ignore - journal is optional
-        }
+        } catch (Exception e) {}
         applyRequest(sample, request);
         Sample saved = sampleRepository.save(sample);
         java.util.Set<Long> newContainerIds = saved.getSpecimens().stream()
@@ -139,14 +131,9 @@ public class SampleService {
         Sample sample = sampleRepository.findById(sampleId)
                 .orElseThrow(() -> new RuntimeException("Образец не найден"));
         try {
-            // Если в `sample_transactions` уже есть ссылки на `specimens` этого образца,
-            // то при каскадном удалении specimens сработает FK-ограничение.
-            // Обнуляем связи в истории, чтобы удаление прошло.
             sampleTransactionService.clearSampleAndSpecimenReferences(sampleId);
             sampleTransactionService.recordSampleWithdrawn(sample);
-        } catch (Exception e) {
-            // ignore - journal is optional
-        }
+        } catch (Exception e) {}
         java.util.Set<Long> containerIds = sample.getSpecimens().stream()
                 .map(s -> s.getContainer() != null ? s.getContainer().getContainerId() : null)
                 .filter(Objects::nonNull)

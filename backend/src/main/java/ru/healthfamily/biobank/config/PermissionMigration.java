@@ -7,7 +7,6 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import ru.healthfamily.biobank.model.Permission;
-import ru.healthfamily.biobank.model.Role;
 import ru.healthfamily.biobank.repository.PermissionRepository;
 import ru.healthfamily.biobank.repository.RoleRepository;
 
@@ -77,7 +76,6 @@ public class PermissionMigration implements CommandLineRunner {
             }
         });
 
-        // Роль "Лаборант" — справочники только для просмотра (reference.view)
         roleRepository.findByRoleName("Лаборант").ifPresent(lab -> {
             var refPermsToRemove = Set.of(
                     "reference.create", "reference.update", "reference.delete", "reference.manage"

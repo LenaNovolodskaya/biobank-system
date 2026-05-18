@@ -141,16 +141,11 @@ public class SampleTransactionService {
                     t.setTransactionType(type);
                     t.setTransactionDate(java.time.LocalDateTime.now());
                     sampleTransactionRepository.save(t);
-                    // Clear sample reference before sample is deleted to avoid FK violation
                     t.setSample(null);
                     sampleTransactionRepository.save(t);
                 });
     }
 
-    /**
-     * Перед удалением `samples/specimens` обнуляем связи в `sample_transactions`,
-     * чтобы внешний ключ на `specimens(specimen_id)` больше не мешал очистке.
-     */
     @Transactional
     public void clearSampleAndSpecimenReferences(Long sampleId) {
         sampleTransactionRepository.clearSampleAndSpecimenReferences(sampleId);
