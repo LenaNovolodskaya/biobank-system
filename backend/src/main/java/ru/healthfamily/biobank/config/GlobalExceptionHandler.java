@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import ru.healthfamily.biobank.exception.ResearchHasLinkedVisitsException;
 import java.util.Map;
 
 @RestControllerAdvice
@@ -18,6 +19,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleBadCredentials(BadCredentialsException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(Map.of("message", "Неверное имя пользователя или пароль"));
+    }
+
+    @ExceptionHandler(ResearchHasLinkedVisitsException.class)
+    public ResponseEntity<Map<String, String>> handleResearchHasLinkedVisits(ResearchHasLinkedVisitsException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("message", ex.getMessage()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

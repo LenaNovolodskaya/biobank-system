@@ -6,7 +6,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import ru.healthfamily.biobank.dto.CreateVisitRequest;
+import ru.healthfamily.biobank.dto.DeleteCheckResponse;
 import ru.healthfamily.biobank.dto.VisitDTO;
+import ru.healthfamily.biobank.model.Sample;
 import ru.healthfamily.biobank.model.Visit;
 import ru.healthfamily.biobank.repository.PatientRepository;
 import ru.healthfamily.biobank.repository.ResearchRepository;
@@ -14,6 +16,7 @@ import ru.healthfamily.biobank.repository.SampleRepository;
 import ru.healthfamily.biobank.repository.VisitRepository;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -45,11 +48,41 @@ public class VisitService {
         return toDTO(visitRepository.save(visit));
     }
 
+    @Transactional(readOnly = true)
+    public DeleteCheckResponse checkCanDeleteVisit(Long visitId) {
+        Visit visit = visitRepository.findById(visitId)
+                .orElseThrow(() -> new RuntimeException("Визит не найден"));
+        List<String> barcodes = sampleRepository.findByVisit_VisitId(visitId).stream()
+                .sorted(Comparator.comparingLong(sample -> sample.getSampleId()))
+                .map(Sample::getBarcode)
+                .collect(Collectors.toList());
+
+        if (!barcodes.isEmpty()) {
+            return new DeleteCheckResponse(
+                    false,
+                    "К данному визиту привязаны следующие образцы: " + barcodes +
+                            ". Прежде чем удалять визит, необходимо удалить или отвязать образцы.",
+                    null
+            );
+        }
+        return new DeleteCheckResponse(true, null, null);
+    }
+
     @Transactional
     public void deleteVisit(Long visitId) {
         Visit visit = visitRepository.findById(visitId)
                 .orElseThrow(() -> new RuntimeException("Визит не найден"));
-        sampleRepository.deleteByVisit_VisitId(visit.getVisitId());
+        List<String> barcodes = sampleRepository.findByVisit_VisitId(visitId).stream()
+                .sorted(Comparator.comparingLong(sample -> sample.getSampleId()))
+                .map(Sample::getBarcode)
+                .collect(Collectors.toList());
+        if (!barcodes.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "К данному визиту привязаны следующие образцы: " + barcodes +
+                            ". Прежде чем удалять визит, необходимо удалить или отвязать образцы."
+            );
+        }
         visitRepository.delete(visit);
     }
 

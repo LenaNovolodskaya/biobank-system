@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import ru.healthfamily.biobank.model.Sample;
 import java.util.Collection;
+import java.util.List;
 
 @Repository
 public interface SampleRepository extends JpaRepository<Sample, Long> {
@@ -12,4 +13,6 @@ public interface SampleRepository extends JpaRepository<Sample, Long> {
     void deleteByVisit_VisitId(Long visitId);
 
     void deleteByVisit_VisitIdIn(Collection<Long> visitIds);
+
+    List<Sample> findByVisit_VisitId(Long visitId);
 }

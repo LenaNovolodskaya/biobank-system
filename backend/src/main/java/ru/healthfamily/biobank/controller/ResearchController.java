@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
 import ru.healthfamily.biobank.dto.CreateResearchRequest;
+import ru.healthfamily.biobank.dto.DeleteCheckResponse;
 import ru.healthfamily.biobank.dto.ResearchDTO;
 import ru.healthfamily.biobank.service.ResearchService;
 import java.util.List;
@@ -45,6 +46,12 @@ public class ResearchController {
             @PathVariable Long researchId,
             @Valid @RequestBody CreateResearchRequest request) {
         return ResponseEntity.ok(researchService.updateResearch(researchId, request));
+    }
+
+    @GetMapping("/{researchId}/can-delete")
+    @PreAuthorize("hasAuthority('research.delete')")
+    public ResponseEntity<DeleteCheckResponse> checkCanDeleteResearch(@PathVariable Long researchId) {
+        return ResponseEntity.ok(researchService.checkCanDeleteResearch(researchId));
     }
 
     @DeleteMapping("/{researchId}")

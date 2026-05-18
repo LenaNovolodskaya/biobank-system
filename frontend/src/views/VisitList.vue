@@ -19,7 +19,7 @@
     <div v-if="successMessage" class="alert alert-success">
       {{ successMessage }}
     </div>
-    <div v-if="errorMessage" class="alert alert-danger">
+    <div v-if="errorMessage" class="alert alert-danger" ref="errorAlert">
       {{ errorMessage }}
     </div>
 
@@ -547,6 +547,14 @@ export default defineComponent({
   watch: {
     "modalVisit.patientId": "handlePatientSelection",
     "modalVisit.collectionDate": "updateAgeFromSelection",
+    errorMessage(value: string) {
+      if (!value) {
+        return;
+      }
+      this.$nextTick(() => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    },
   },
   methods: {
     toggleHeaderHelp(
@@ -928,6 +936,15 @@ export default defineComponent({
         return;
       }
       try {
+        const checkResponse = await axios.get(
+          `/visits/${this.selectedVisitId}/can-delete`
+        );
+
+        if (!checkResponse.data.canDelete) {
+          this.errorMessage = checkResponse.data.message;
+          return;
+        }
+
         await axios.delete(`/visits/${this.selectedVisitId}`);
         this.successMessage = "Визит удален";
         this.selectedVisitId = null;

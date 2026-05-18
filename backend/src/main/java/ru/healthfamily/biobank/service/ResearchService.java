@@ -4,7 +4,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.healthfamily.biobank.dto.CreateResearchRequest;
+import ru.healthfamily.biobank.dto.DeleteCheckResponse;
 import ru.healthfamily.biobank.dto.ResearchDTO;
+import ru.healthfamily.biobank.exception.ResearchHasLinkedVisitsException;
 import ru.healthfamily.biobank.model.Department;
 import ru.healthfamily.biobank.model.FinancingSource;
 import ru.healthfamily.biobank.model.Research;
@@ -17,6 +19,7 @@ import ru.healthfamily.biobank.repository.SampleRepository;
 import ru.healthfamily.biobank.repository.VisitRepository;
 import java.util.List;
 import java.util.List;
+import java.util.Comparator;
 import java.util.stream.Collectors;
 
 @Service
@@ -45,17 +48,43 @@ public class ResearchService {
         return toDTO(researchRepository.save(research));
     }
 
+    @Transactional(readOnly = true)
+    public DeleteCheckResponse checkCanDeleteResearch(Long researchId) {
+        Research research = researchRepository.findById(researchId)
+                .orElseThrow(() -> new RuntimeException("Исследование не найдено"));
+        List<Long> visitIds = visitRepository.findByResearch_ResearchId(researchId).stream()
+                .sorted(Comparator.comparingLong(visit -> visit.getVisitId()))
+                .map(visit -> visit.getVisitId())
+                .collect(Collectors.toList());
+        
+        if (!visitIds.isEmpty()) {
+            return new DeleteCheckResponse(
+                false,
+                "К данному исследованию привязаны следующие визиты: " + visitIds + 
+                ". Прежде чем удалять исследование, необходимо удалить или отвязать визиты.",
+                visitIds
+            );
+        }
+        
+        return new DeleteCheckResponse(true, null, null);
+    }
+
     @Transactional
     public void deleteResearch(Long researchId) {
         Research research = researchRepository.findById(researchId)
                 .orElseThrow(() -> new RuntimeException("Исследование не найдено"));
         List<Long> visitIds = visitRepository.findByResearch_ResearchId(researchId).stream()
+                .sorted(Comparator.comparingLong(visit -> visit.getVisitId()))
                 .map(visit -> visit.getVisitId())
                 .collect(Collectors.toList());
+        
         if (!visitIds.isEmpty()) {
-            sampleRepository.deleteByVisit_VisitIdIn(visitIds);
+            throw new ResearchHasLinkedVisitsException(
+                "К данному исследованию привязаны следующие визиты: " + visitIds + 
+                ". Прежде чем удалять исследование, необходимо удалить или отвязать визиты"
+            );
         }
-        visitRepository.deleteByResearch_ResearchId(researchId);
+        
         researchRepository.delete(research);
     }
 

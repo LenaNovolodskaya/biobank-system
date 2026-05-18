@@ -19,7 +19,7 @@
     <div v-if="successMessage" class="alert alert-success">
       {{ successMessage }}
     </div>
-    <div v-if="errorMessage" class="alert alert-danger">
+    <div v-if="errorMessage" class="alert alert-danger" ref="errorAlert">
       {{ errorMessage }}
     </div>
 
@@ -616,6 +616,16 @@ export default defineComponent({
     this.fetchNationalities();
     this.fetchDiagnoses();
   },
+  watch: {
+    errorMessage(value: string) {
+      if (!value) {
+        return;
+      }
+      this.$nextTick(() => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    },
+  },
   methods: {
     async fetchPatients() {
       this.loading = true;
@@ -949,6 +959,13 @@ export default defineComponent({
       this.successMessage = "";
       this.errorMessage = "";
       try {
+        const checkResponse = await axios.get(
+          `/patients/${this.selectedPatientId}/can-delete`
+        );
+        if (!checkResponse.data.canDelete) {
+          this.errorMessage = checkResponse.data.message;
+          return;
+        }
         await axios.delete(`/patients/${this.selectedPatientId}`);
         this.successMessage = "Пациент удалён";
         this.selectedPatientId = null;

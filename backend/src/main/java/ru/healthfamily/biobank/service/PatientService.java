@@ -1,9 +1,12 @@
 package ru.healthfamily.biobank.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 import ru.healthfamily.biobank.dto.CreatePatientRequest;
+import ru.healthfamily.biobank.dto.DeleteCheckResponse;
 import ru.healthfamily.biobank.dto.PatientDTO;
 import ru.healthfamily.biobank.model.Diagnosis;
 import ru.healthfamily.biobank.model.Nationality;
@@ -16,6 +19,7 @@ import ru.healthfamily.biobank.repository.VisitRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -113,18 +117,41 @@ public class PatientService {
         return convertToDTO(patientRepository.save(patient));
     }
 
+    @Transactional(readOnly = true)
+    public DeleteCheckResponse checkCanDeletePatient(Long id) {
+        Patient patient = patientRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Пациент не найден"));
+        List<Long> visitIds = visitRepository.findByPatient_PatientId(id).stream()
+                .sorted(Comparator.comparingLong(visit -> visit.getVisitId()))
+                .map(visit -> visit.getVisitId())
+                .collect(Collectors.toList());
+        if (!visitIds.isEmpty()) {
+            return new DeleteCheckResponse(
+                    false,
+                    "К данному пациенту привязаны следующие визиты: " + visitIds +
+                            ". Прежде чем удалять пациента, необходимо удалить или отвязать визиты.",
+                    visitIds
+            );
+        }
+        return new DeleteCheckResponse(true, null, null);
+    }
+
     @Transactional
     public void deletePatient(Long id) {
         if (!patientRepository.existsById(id)) {
             throw new RuntimeException("Пациент не найден");
         }
         List<Long> visitIds = visitRepository.findByPatient_PatientId(id).stream()
+                .sorted(Comparator.comparingLong(visit -> visit.getVisitId()))
                 .map(visit -> visit.getVisitId())
                 .collect(Collectors.toList());
         if (!visitIds.isEmpty()) {
-            sampleRepository.deleteByVisit_VisitIdIn(visitIds);
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "К данному пациенту привязаны следующие визиты: " + visitIds +
+                            ". Прежде чем удалять пациента, необходимо удалить или отвязать визиты."
+            );
         }
-        visitRepository.deleteByPatient_PatientId(id);
         patientRepository.deleteById(id);
     }
     

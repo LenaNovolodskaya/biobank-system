@@ -19,7 +19,7 @@
     <div v-if="successMessage" class="alert alert-success">
       {{ successMessage }}
     </div>
-    <div v-if="errorMessage" class="alert alert-danger">
+    <div v-if="errorMessage" class="alert alert-danger" ref="errorAlert">
       {{ errorMessage }}
     </div>
 
@@ -618,6 +618,16 @@ export default defineComponent({
       return [];
     },
   },
+  watch: {
+    errorMessage(value: string) {
+      if (!value) {
+        return;
+      }
+      this.$nextTick(() => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    },
+  },
   created() {
     this.fetchResearches();
     this.fetchReferences();
@@ -962,12 +972,38 @@ export default defineComponent({
         return;
       }
       try {
+        // Check if research can be deleted
+        const checkResponse = await axios.get(
+          `/researches/${this.selectedResearchId}/can-delete`
+        );
+
+        if (!checkResponse.data.canDelete) {
+          this.errorMessage = checkResponse.data.message;
+          return;
+        }
+
+        // If can delete, proceed with deletion
         await axios.delete(`/researches/${this.selectedResearchId}`);
         this.successMessage = "Исследование удалено";
         this.selectedResearchId = null;
         await this.fetchResearches();
       } catch (error) {
-        this.errorMessage = "Ошибка при удалении исследования";
+        const axiosError = error as {
+          response?: {
+            data?: {
+              message?: string;
+            };
+          };
+        };
+
+        if (
+          axiosError.response?.data?.message &&
+          typeof axiosError.response.data.message === "string"
+        ) {
+          this.errorMessage = axiosError.response.data.message;
+        } else {
+          this.errorMessage = "Ошибка при удалении исследования";
+        }
       }
     },
   },

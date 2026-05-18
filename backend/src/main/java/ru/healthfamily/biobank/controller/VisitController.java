@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
 import ru.healthfamily.biobank.dto.CreateVisitRequest;
+import ru.healthfamily.biobank.dto.DeleteCheckResponse;
 import ru.healthfamily.biobank.dto.VisitDTO;
 import ru.healthfamily.biobank.service.VisitService;
 import java.util.List;
@@ -45,6 +46,12 @@ public class VisitController {
             @PathVariable Long visitId,
             @Valid @RequestBody CreateVisitRequest request) {
         return ResponseEntity.ok(visitService.updateVisit(visitId, request));
+    }
+
+    @GetMapping("/{visitId}/can-delete")
+    @PreAuthorize("hasAuthority('visit.delete')")
+    public ResponseEntity<DeleteCheckResponse> checkCanDeleteVisit(@PathVariable Long visitId) {
+        return ResponseEntity.ok(visitService.checkCanDeleteVisit(visitId));
     }
 
     @DeleteMapping("/{visitId}")

@@ -248,7 +248,7 @@
           </div>
           <div class="filter-row-actions">
             <button
-              class="icon-button"
+              class="icon-button danger"
               type="button"
               aria-label="Удалить фильтр"
               title="Удалить фильтр"

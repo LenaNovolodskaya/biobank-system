@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import ru.healthfamily.biobank.dto.CreatePatientRequest;
+import ru.healthfamily.biobank.dto.DeleteCheckResponse;
 import ru.healthfamily.biobank.dto.PatientDTO;
 import ru.healthfamily.biobank.service.PatientService;
 import java.util.List;
@@ -54,6 +55,12 @@ public class PatientController {
     ) {
         PatientDTO patient = patientService.updatePatient(id, request);
         return ResponseEntity.ok(patient);
+    }
+
+    @GetMapping("/{id}/can-delete")
+    @PreAuthorize("hasAuthority('patient.delete')")
+    public ResponseEntity<DeleteCheckResponse> checkCanDeletePatient(@PathVariable Long id) {
+        return ResponseEntity.ok(patientService.checkCanDeletePatient(id));
     }
 
     @DeleteMapping("/{id}")
