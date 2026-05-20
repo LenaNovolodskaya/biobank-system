@@ -192,8 +192,11 @@ public class SampleService {
                             () -> sample.setCreatedAtSample(LocalDate.now().atTime(8, 0)));
         }
         sample.setContainer(request.getContainerId() != null
-                ? containerRepository.findById(request.getContainerId()).orElse(null)
-                : null);
+            ? containerRepository.findById(request.getContainerId()).orElse(null)
+            : null);
+        if (request.getContainerId() != null && sample.getContainer() == null) {
+            throw new IllegalArgumentException("Контейнера с ID " + request.getContainerId() + " нет в хранилище");
+        }
         applyStorageStatus(sample);
 
         sample.getSpecimens().clear();
@@ -201,6 +204,58 @@ public class SampleService {
         Long inStorageId = getInStorageStatusId();
         SampleStatus inStorageStatus = inStorageId != null ? sampleStatusRepository.findById(inStorageId).orElse(null) : null;
         if (request.getSpecimens() != null && !request.getSpecimens().isEmpty()) {
+            // Validate container existence and position occupancy before adding specimens
+            // Map containerId -> (position -> list of specimen barcodes requesting this position)
+            java.util.Map<Long, java.util.Map<String, java.util.List<String>>> posMap = new java.util.HashMap<>();
+            java.util.List<String> duplicatePositionsWithinRequest = new java.util.ArrayList<>();
+            for (CreateSampleRequest.SpecimenItem item : request.getSpecimens()) {
+                Long containerIdToUse = item.getContainerId() != null ? item.getContainerId() : request.getContainerId();
+                if (containerIdToUse != null) {
+                    if (!containerRepository.existsById(containerIdToUse)) {
+                        throw new IllegalArgumentException("Контейнера с ID " + containerIdToUse + " нет в хранилище");
+                    }
+                }
+                String pos = item.getPositionInContainer() != null ? item.getPositionInContainer().trim() : null;
+                String specimenBarcode = item.getBarcode() != null ? item.getBarcode() : "";
+                if (containerIdToUse != null && pos != null && !pos.isEmpty()) {
+                    posMap.computeIfAbsent(containerIdToUse, k -> new java.util.HashMap<>());
+                    java.util.Map<String, java.util.List<String>> inner = posMap.get(containerIdToUse);
+                    if (!inner.containsKey(pos)) {
+                        inner.put(pos, new java.util.ArrayList<>());
+                    }
+                    java.util.List<String> list = inner.get(pos);
+                    if (list.contains(specimenBarcode)) {
+                        // same barcode repeated for same position
+                        duplicatePositionsWithinRequest.add(specimenBarcode);
+                    }
+                    list.add(specimenBarcode);
+                }
+            }
+
+            java.util.Map<String, java.util.List<String>> occupiedPosToBarcodes = new java.util.HashMap<>();
+            for (java.util.Map.Entry<Long, java.util.Map<String, java.util.List<String>>> e : posMap.entrySet()) {
+                Long containerId = e.getKey();
+                for (String pos : e.getValue().keySet()) {
+                    boolean exists = specimenRepository.existsByContainer_ContainerIdAndPositionInContainer(containerId, pos);
+                    if (exists) {
+                        occupiedPosToBarcodes.put(pos, e.getValue().get(pos));
+                    }
+                }
+            }
+            if (!duplicatePositionsWithinRequest.isEmpty()) {
+                throw new IllegalArgumentException("Дублирующиеся штрихкоды проб в запросе: " + String.join(", ", duplicatePositionsWithinRequest));
+            }
+            if (!occupiedPosToBarcodes.isEmpty()) {
+                // Build message listing specimen barcodes and positions
+                java.util.List<String> parts = new java.util.ArrayList<>();
+                for (java.util.Map.Entry<String, java.util.List<String>> en : occupiedPosToBarcodes.entrySet()) {
+                    String pos = en.getKey();
+                    String barcodes = String.join(", ", en.getValue());
+                    parts.add(barcodes + " (позиция: " + pos + ")");
+                }
+                throw new IllegalArgumentException("Не удалось разместить пробы: " + String.join("; ", parts) + ". Позиции уже заняты.");
+            }
+
             for (CreateSampleRequest.SpecimenItem item : request.getSpecimens()) {
                 Specimen specimen = new Specimen();
                 specimen.setSample(sample);

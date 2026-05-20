@@ -249,6 +249,31 @@
                 placeholder="Дата от"
               />
             </template>
+            <template v-else-if="row.fieldKey === 'patientBirthDateTo'">
+              <input
+                v-model="row.value"
+                type="date"
+                class="form-control"
+                placeholder="Дата до"
+              />
+            </template>
+            <template v-else-if="row.fieldKey === 'visitId'">
+              <input
+                v-model.number="row.value"
+                type="number"
+                min="1"
+                class="form-control"
+                placeholder="ID визита"
+              />
+            </template>
+            <template v-else-if="row.fieldKey === 'patientId'">
+              <input
+                v-model="row.value"
+                type="text"
+                class="form-control"
+                placeholder="ID или штрихкод"
+              />
+            </template>
             <template v-else>
               <span class="filter-placeholder">—</span>
             </template>
@@ -1163,8 +1188,11 @@ export default defineComponent({
         { key: "comorbidDiagnosisId", label: "Сопутствующие диагнозы" },
         { key: "patientGender", label: "Пол" },
         { key: "patientBirthDateFrom", label: "Дата рождения от" },
+        { key: "patientBirthDateTo", label: "Дата рождения до" },
         { key: "patientNationalityId", label: "Национальность" },
         { key: "researchId", label: "Исследование" },
+        { key: "visitId", label: "ID визита" },
+        { key: "patientId", label: "ID пациента" },
       ] as Array<{ key: string; label: string }>,
       columns: [
         { key: "sampleTypeIcon", label: "", labelFull: "", visible: true },
@@ -1960,9 +1988,19 @@ export default defineComponent({
       if (
         fieldKey === "createdAtSampleFrom" ||
         fieldKey === "createdAtSampleTo" ||
-        fieldKey === "patientBirthDateFrom"
+        fieldKey === "patientBirthDateFrom" ||
+        fieldKey === "patientBirthDateTo"
       ) {
         return typeof value === "string" && value.trim().length > 0;
+      }
+      if (fieldKey === "visitId") {
+        const num = Number(value);
+        return Number.isFinite(num) && num > 0;
+      }
+      if (fieldKey === "patientId") {
+        return typeof value === "string"
+          ? value.trim().length > 0
+          : Number.isFinite(Number(value));
       }
       return true;
     },
@@ -2017,6 +2055,35 @@ export default defineComponent({
           : null;
         const filterDate = this.getDateOnly(value as string);
         return !filterDate || !birthDate || birthDate >= filterDate;
+      }
+      if (fieldKey === "patientBirthDateTo") {
+        const patient = this.getPatientByVisit(sample.visitId);
+        const birthDate = patient?.birthDate
+          ? this.getDateOnly(patient.birthDate)
+          : null;
+        const filterDate = this.getDateOnly(value as string);
+        return !filterDate || !birthDate || birthDate <= filterDate;
+      }
+      if (fieldKey === "visitId") {
+        const id = Number(value);
+        return !Number.isFinite(id) || sample.visitId === id;
+      }
+      if (fieldKey === "patientId") {
+        const patient = this.getPatientByVisit(sample.visitId);
+        if (!patient) {
+          return false;
+        }
+        const filterValue = String(value || "").trim();
+        if (!filterValue) {
+          return true;
+        }
+        const numericId = Number(filterValue);
+        const matchesId =
+          Number.isFinite(numericId) && patient.patientId === numericId;
+        const matchesBarcode = patient.patientBarcode
+          .toLowerCase()
+          .includes(filterValue.toLowerCase());
+        return matchesId || matchesBarcode;
       }
       if (fieldKey === "sampleTypeId") {
         return value == null || sample.sampleTypeId === value;
@@ -2200,6 +2267,7 @@ export default defineComponent({
         barcode: string;
         sampleTypeId: number | null;
         containerId: number | null;
+        containerName: string | null;
         initialQuantity: number | null;
         recommendedStorageMonths: number | null;
         collectionDate: string | null;
@@ -2226,12 +2294,13 @@ export default defineComponent({
         if (!Number.isFinite(visitIdNum)) continue;
 
         const groupKey = `${visitIdNum}::${barcode}`;
+        const rawContainer = getRowVal("containerId")?.trim();
+        const containerId = rawContainer
+          ? this.resolveImportContainer(rawContainer)
+          : null;
         if (!sampleGroups.has(groupKey)) {
           const sampleTypeId = this.resolveImportSampleType(
             getRowVal("sampleTypeId")
-          );
-          const containerId = this.resolveImportContainer(
-            getRowVal("containerId")
           );
           const initialQty = this.toNullableNumber(
             Number(getRowVal("initialQuantity") ?? NaN)
@@ -2250,6 +2319,7 @@ export default defineComponent({
             barcode,
             sampleTypeId,
             containerId,
+            containerName: rawContainer || null,
             initialQuantity: initialQty,
             recommendedStorageMonths: recommended,
             collectionDate: collectionDateFormatted,
@@ -2258,6 +2328,9 @@ export default defineComponent({
         }
 
         const sampleGroup = sampleGroups.get(groupKey);
+        if (sampleGroup && rawContainer && sampleGroup.containerId == null) {
+          sampleGroup.containerName = rawContainer;
+        }
         const specimenBarcode = getRowVal("specimenBarcode")?.trim();
         if (specimenBarcode && sampleGroup) {
           sampleGroup.specimens.push({
@@ -2282,6 +2355,13 @@ export default defineComponent({
           sampleGroup.specimens.length > 0
             ? sampleGroup.specimens.length
             : initialQty;
+        if (sampleGroup.containerName && sampleGroup.containerId == null) {
+          failed++;
+          failedSamples.push(
+            `${sampleGroup.barcode}: Контейнера ${sampleGroup.containerName} нет в хранилище`
+          );
+          continue;
+        }
         try {
           await axios.post("/samples", {
             visitId: sampleGroup.visitId,
@@ -3141,6 +3221,14 @@ h2 {
   background-color: rgba(127, 63, 50, 0.12);
   color: #733d31;
   border: 1px solid #7f3f32;
+}
+
+.modal .alert {
+  max-width: 100%;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .samples-table tr.selected {

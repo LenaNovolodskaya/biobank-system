@@ -19,4 +19,6 @@ public interface SpecimenRepository extends JpaRepository<Specimen, Long> {
     List<Specimen> findAllWithSample();
 
     long countByContainer_ContainerId(Long containerId);
+
+    boolean existsByContainer_ContainerIdAndPositionInContainer(Long containerId, String positionInContainer);
 }
