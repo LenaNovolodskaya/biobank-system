@@ -161,11 +161,10 @@
             </template>
             <template v-else-if="row.fieldKey === 'recommendedStorageMonths'">
               <input
-                v-model.number="row.value"
-                type="number"
-                min="0"
+                v-model="row.value"
+                type="text"
                 class="form-control"
-                placeholder="Месяцев"
+                placeholder="Месяцев или бессрочно"
               />
             </template>
             <template v-else-if="row.fieldKey === 'ageMin'">
@@ -1567,7 +1566,7 @@ export default defineComponent({
       if (!startDate || !today) return null;
       const diff = this.getMonthsDaysDiff(startDate, today);
       if (!diff) return null;
-      return diff.months + diff.days / 30;
+      return diff.months;
     },
     getMonthsDaysDiff(startDate: Date, endDate: Date) {
       if (endDate < startDate) {
@@ -1943,9 +1942,18 @@ export default defineComponent({
         fieldKey === "ageMax" ||
         fieldKey === "initialQuantity" ||
         fieldKey === "currentQuantity" ||
-        fieldKey === "recommendedStorageMonths" ||
         fieldKey === "actualStorageMonths"
       ) {
+        const num = Number(value);
+        return Number.isFinite(num) && num >= 0;
+      }
+      if (fieldKey === "recommendedStorageMonths") {
+        if (typeof value === "string") {
+          const normalized = value.trim().toLowerCase();
+          if (normalized === "бессрочно") {
+            return true;
+          }
+        }
         const num = Number(value);
         return Number.isFinite(num) && num >= 0;
       }
@@ -2023,7 +2031,14 @@ export default defineComponent({
         return value == null || sample.currentQuantity === value;
       }
       if (fieldKey === "recommendedStorageMonths") {
-        return value == null || sample.recommendedStorageMonths === value;
+        if (typeof value === "string") {
+          const normalized = value.trim().toLowerCase();
+          if (normalized === "бессрочно") {
+            return sample.recommendedStorageMonths == null;
+          }
+        }
+        const num = Number(value);
+        return !Number.isFinite(num) || sample.recommendedStorageMonths === num;
       }
       if (fieldKey === "ageMin") {
         const visit = this.getVisitById(sample.visitId);

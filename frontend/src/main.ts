@@ -21,15 +21,15 @@ axios.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      alert("Время сессии истекло. Пожалуйста, войдите в систему заново.");
-      store.commit("clearAuth");
-      if (
-        router.currentRoute.value.path !== "/login" &&
-        router.currentRoute.value.path !== "/register"
-      ) {
+      const isAuthPage =
+        router.currentRoute.value.path === "/login" ||
+        router.currentRoute.value.path === "/register";
+      if (!isAuthPage) {
+        alert("Время сессии истекло. Пожалуйста, войдите в систему заново.");
+        store.commit("clearAuth");
         router.push("/login");
       }
-      return;
+      return Promise.reject(error);
     }
     return Promise.reject(error);
   }

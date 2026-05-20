@@ -82,7 +82,29 @@ public class VisitService {
                             ". Прежде чем удалять визит, необходимо удалить или отвязать образцы."
             );
         }
+
+        Long patientId = visit.getPatient().getPatientId();
+        Integer deletedVisitNumber = visit.getVisitNumber();
+
         visitRepository.delete(visit);
+
+        List<Visit> patientVisits = visitRepository
+                .findByPatient_PatientIdOrderByVisitNumberAsc(patientId);
+
+        for (int i = 0; i < patientVisits.size(); i++) {
+            Visit currentVisit = patientVisits.get(i);
+            int expectedNumber = i + 1;
+            int currentNumber = currentVisit.getVisitNumber() != null
+                    ? currentVisit.getVisitNumber()
+                    : 0;
+            if (currentNumber != expectedNumber) {
+                currentVisit.setVisitNumber(expectedNumber);
+            }
+        }
+
+        if (!patientVisits.isEmpty()) {
+            visitRepository.saveAll(patientVisits);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -139,7 +161,7 @@ public class VisitService {
         if (visitRepository.existsByPatient_PatientIdAndCollectionDate(patientId, collectionDate)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "У пациента уже есть визит на эту дату"
+                    "У пациента уже есть визит в указанную дату и время"
             );
         }
     }
@@ -159,7 +181,7 @@ public class VisitService {
         )) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "У пациента уже есть визит на эту дату"
+                    "У пациента уже есть визит в указанную дату и время"
             );
         }
     }

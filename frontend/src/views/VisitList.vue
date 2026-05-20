@@ -262,17 +262,25 @@
     </div>
 
     <div v-if="modalOpen" class="modal-overlay" @click.self="closeModal">
-      <div class="modal form-modal">
+      <div class="modal form-modal" ref="visitModal">
         <div class="modal-header">
           <h3>{{ modalTitle }}</h3>
           <button class="btn btn-secondary" @click="closeModal">Закрыть</button>
         </div>
 
-        <div v-if="errorMessage" class="alert alert-danger modal-alert">
-          {{ errorMessage }}
+        <div
+          v-if="visitConflictWarning"
+          class="alert alert-warning visit-warning"
+          ref="warningAlert"
+        >
+          {{ visitConflictWarning }}
         </div>
 
-        <form class="form-grid" @submit.prevent="submitModal">
+        <div v-if="modalErrorMessage" class="alert alert-danger modal-alert">
+          {{ modalErrorMessage }}
+        </div>
+
+        <form class="form-grid" @submit.prevent="submitModal" ref="visitForm">
           <div class="form-group">
             <label for="modalPatient">Пациент *</label>
             <select
@@ -510,6 +518,7 @@ export default defineComponent({
       loading: false,
       successMessage: "",
       errorMessage: "",
+      modalErrorMessage: "",
       selectedVisitId: null as number | null,
       modalOpen: false,
       modalMode: "create" as "create" | "edit",
@@ -522,6 +531,7 @@ export default defineComponent({
         ageAtCollection: null,
         diagnosisId: null,
       } as VisitForm,
+      visitConflictWarning: "",
       refModalOpen: false,
       refModalTitle: "",
       refModalMode: "create" as "create" | "edit",
@@ -554,6 +564,13 @@ export default defineComponent({
       this.$nextTick(() => {
         window.scrollTo({ top: 0, behavior: "smooth" });
       });
+    },
+    modalOpen(value: boolean) {
+      if (value) {
+        this.modalErrorMessage = "";
+        this.visitConflictWarning = "";
+        this.errorMessage = "";
+      }
     },
   },
   methods: {
@@ -822,6 +839,7 @@ export default defineComponent({
     },
     handlePatientSelection() {
       this.updateAgeFromSelection();
+      this.checkVisitConflict();
       const patient = this.patients.find(
         (item) => item.patientId === this.modalVisit.patientId
       );
@@ -865,9 +883,45 @@ export default defineComponent({
         age -= 1;
       }
       this.modalVisit.ageAtCollection = age;
+      this.checkVisitConflict();
+    },
+    checkVisitConflict() {
+      this.visitConflictWarning = "";
+      if (!this.modalVisit.patientId || !this.modalVisit.collectionDate) {
+        return;
+      }
+      const conflictingVisit = this.visits.find(
+        (visit) =>
+          visit.patientId === this.modalVisit.patientId &&
+          visit.collectionDate === this.modalVisit.collectionDate &&
+          (this.modalMode === "create" ||
+            visit.visitId !== this.selectedVisitId)
+      );
+      if (conflictingVisit) {
+        this.visitConflictWarning =
+          "У пациента уже есть визит в указанную дату и время";
+        this.$nextTick(() => {
+          const modalElement = this.$refs.visitModal as HTMLElement | null;
+          const warningElement = this.$refs.warningAlert as HTMLElement | null;
+          if (modalElement && warningElement) {
+            requestAnimationFrame(() => {
+              const modalRect = modalElement.getBoundingClientRect();
+              const warningRect = warningElement.getBoundingClientRect();
+              const scrollTop =
+                warningRect.top - modalRect.top + modalElement.scrollTop - 12;
+              modalElement.scrollTo({
+                top: Math.max(0, scrollTop),
+                behavior: "smooth",
+              });
+            });
+          }
+        });
+      }
     },
     closeModal() {
       this.modalOpen = false;
+      this.modalErrorMessage = "";
+      this.visitConflictWarning = "";
     },
     resetVisitForm() {
       this.modalVisit = {
@@ -878,7 +932,8 @@ export default defineComponent({
         ageAtCollection: null,
         diagnosisId: null,
       };
-      this.errorMessage = "";
+      this.modalErrorMessage = "";
+      this.visitConflictWarning = "";
     },
     async submitModal() {
       if (
@@ -886,7 +941,7 @@ export default defineComponent({
         (this.modalVisit.patientId == null ||
           this.modalVisit.researchId == null)
       ) {
-        this.errorMessage = "Выберите пациента и исследование";
+        this.modalErrorMessage = "Выберите пациента и исследование";
         return;
       }
       if (this.modalMode === "create") {
@@ -902,7 +957,7 @@ export default defineComponent({
         this.closeModal();
         await this.fetchVisits();
       } catch (error) {
-        this.errorMessage = this.resolveErrorMessage(
+        this.modalErrorMessage = this.resolveErrorMessage(
           error,
           "Ошибка при добавлении визита"
         );
@@ -921,7 +976,7 @@ export default defineComponent({
         this.closeModal();
         await this.fetchVisits();
       } catch (error) {
-        this.errorMessage = this.resolveErrorMessage(
+        this.modalErrorMessage = this.resolveErrorMessage(
           error,
           "Ошибка при обновлении визита"
         );
@@ -1396,5 +1451,23 @@ h2 {
 
 .barcode-cell :deep(.barcode-svg) {
   max-width: 200px;
+}
+
+.alert-warning {
+  background-color: #ffe6a8;
+  color: #6b5c4f;
+  border: 1px solid #ffd980;
+  max-width: 100%;
+  max-height: 150px;
+  overflow-y: auto;
+  padding: 12px;
+  margin: 12px 0;
+  border-radius: 6px;
+  text-align: left;
+  font-weight: 500;
+}
+
+.visit-warning {
+  grid-column: 1 / -1;
 }
 </style>
